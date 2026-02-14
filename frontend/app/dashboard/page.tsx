@@ -91,6 +91,41 @@ export default function Dashboard() {
     setShowLogoutConfirm(true);
   };
 
+  const handleDownload = async (resourceId: number, title: string) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${resourceId}/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        // Get the blob from response
+        const blob = await res.blob();
+        
+        // Create a temporary URL for the blob
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = title || `resource-${resourceId}`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Download failed: Unable to download file');
+      }
+    } catch (error) {
+      console.error("Download failed", error);
+      alert('Download failed');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
@@ -177,9 +212,19 @@ export default function Dashboard() {
             <ul className="divide-y divide-gray-200">
               {resources.map((resource) => (
                 <li key={resource.id} className="py-4">
-                  <h3 className="text-lg font-medium text-gray-900">{resource.title}</h3>
-                  <p className="text-gray-600">{resource.description}</p>
-                  <p className="text-sm text-gray-500 mt-1">Uploaded by User #{resource.uploader_id}</p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">{resource.title}</h3>
+                      <p className="text-gray-600">{resource.description}</p>
+                      <p className="text-sm text-gray-500 mt-1">Uploaded by User #{resource.uploader_id}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDownload(resource.id, resource.title)}
+                      className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-4"
+                    >
+                      Download
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
