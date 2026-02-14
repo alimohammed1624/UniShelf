@@ -1,0 +1,23 @@
+[project]
+name = "unishelf-backend"
+version = "0.1.0"
+description = "UniShelf backend API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "python-multipart",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "bcrypt==4.0.1",
+    "minio",
+    "pydantic-settings>=2.12.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

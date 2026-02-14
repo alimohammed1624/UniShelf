@@ -1,129 +1,39 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-interface Resource {
-  id: number;
-  title: string;
-  description: string;
-  visibility: string;
-  file_path: string;
-  uploader_id: number;
-  created_at: string;
-}
+import { useState } from 'react';
+import { Resource } from '@/types';
+import { useResources } from '@/hooks/useResources';
 
 export default function Dashboard() {
-  const [resources, setResources] = useState<Resource[]>([]);
+  const { 
+    resources, 
+    loading, 
+    file, 
+    setFile, 
+    fileInputRef, 
+    uploadResource, 
+    downloadResource, 
+    removeFile, 
+    logout 
+  } = useResources();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/');
-      return;
-    }
-    fetchResources();
-  }, [router]);
-
-  const fetchResources = async () => {
-    try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if (res.ok) {
-        const data = await res.json();
-        setResources(data);
-        }
-    } catch (error) {
-        console.error("Failed to fetch resources", error);
-    }
-  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('file', file);
-    formData.append('visibility', 'public');
-
-    const token = localStorage.getItem('token');
-    try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        body: formData,
-        });
-
-        if (res.ok) {
-        alert('Upload successful');
-        fetchResources();
-        setTitle('');
-        setDescription('');
-        setFile(null);
-        } else {
-        alert('Upload failed');
-        }
-    } catch (error) {
-        console.error("Upload failed", error);
-        alert('Upload failed');
+    const success = await uploadResource(title, description);
+    if (success) {
+      setTitle('');
+      setDescription('');
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/');
   };
 
   const handleLogoutClick = () => {
     setShowLogoutConfirm(true);
-  };
-
-  const handleDownload = async (resourceId: number, title: string) => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${resourceId}/download`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (res.ok) {
-        // Get the blob from response
-        const blob = await res.blob();
-        
-        // Create a temporary URL for the blob
-        const url = window.URL.createObjectURL(blob);
-        
-        // Create a temporary anchor element and trigger download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = title || `resource-${resourceId}`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Cleanup
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        alert('Download failed: Unable to download file');
-      }
-    } catch (error) {
-      console.error("Download failed", error);
-      alert('Download failed');
-    }
   };
 
   return (
@@ -152,7 +62,7 @@ export default function Dashboard() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleLogout}
+                  onClick={logout}
                   className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                 >
                   Logout
@@ -186,14 +96,35 @@ export default function Dashboard() {
               />
             </div>
             <div className="mb-6">
-              <label htmlFor="file" className="block text-gray-700 text-sm font-bold mb-2">File</label>
-              <input
-                id="file"
-                type="file"
-                onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              />
+              <label className="block text-gray-700 text-sm font-bold mb-2">File</label>
+              <div className="flex items-center gap-4">
+                {file ? (
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded cursor-pointer focus:outline-none focus:shadow-outline transition duration-150 ease-in-out"
+                  >
+                    Remove File
+                  </button>
+                ) : (
+                  <label 
+                    htmlFor="file" 
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded cursor-pointer focus:outline-none focus:shadow-outline transition duration-150 ease-in-out"
+                  >
+                    Choose File
+                  </label>
+                )}
+                <span className="text-gray-600 text-sm">
+                  {file ? file.name : 'No file chosen'}
+                </span>
+                <input
+                  id="file"
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
             <button
               type="submit"
@@ -219,7 +150,7 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-500 mt-1">Uploaded by User #{resource.uploader_id}</p>
                     </div>
                     <button
-                      onClick={() => handleDownload(resource.id, resource.title)}
+                      onClick={() => downloadResource(resource.id, resource.title)}
                       className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-4"
                     >
                       Download

@@ -2,9 +2,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from app.config import settings
 
 # Use environment variable or default to SQLite for local development
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./unishelf.db")
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 # Handle SQLite vs Postgres engine arguments
 connect_args = {}
