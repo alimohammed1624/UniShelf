@@ -33,7 +33,7 @@ export default function Dashboard() {
   const fetchResources = async () => {
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/resources`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -59,7 +59,7 @@ export default function Dashboard() {
 
     const token = localStorage.getItem('token');
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/resources`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`

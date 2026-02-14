@@ -15,7 +15,7 @@ export default function Home() {
     if (isRegistering) {
         // Registration Logic
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/register`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -39,7 +39,7 @@ export default function Home() {
             formData.append('username', email);
             formData.append('password', password);
 
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/token`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData,
