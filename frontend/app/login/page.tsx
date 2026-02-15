@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { toast } from 'sonner';
-import { useAppDispatch } from '../../lib/hooks';
-import { loginUser } from '../../lib/features/auth/authSlice';
+import { useAppDispatch } from '@/lib/hooks';
+import { loginUser } from '@/lib/features/auth/authSlice';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { AuthCard } from '@/components/auth/auth-card';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -31,53 +34,44 @@ export default function LoginPage() {
       
       await promise;
       router.push('/dashboard');
-    } catch (err) {
+    } catch {
       // Error handled by toast
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded shadow-md w-96">
-        <h1 className="mb-6 text-2xl font-bold text-center text-gray-800">UniShelf</h1>
-        <h2 className="mb-4 text-lg text-center text-gray-600">Login</h2>
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="email" className="block mb-2 text-sm font-bold text-gray-700">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded text-gray-700 focus:outline-none focus:shadow-outline"
-              required
-            />
-          </div>
-          <div className="mb-6">
-            <label htmlFor="password" className="block mb-2 text-sm font-bold text-gray-700">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded text-gray-700 focus:outline-none focus:shadow-outline"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full px-4 py-2 font-bold text-white bg-blue-500 rounded hover:bg-blue-700 focus:outline-none focus:shadow-outline"
-          >
-            Login
-          </button>
-        </form>
-        <div className="mt-4 text-center">
-          <Link href="/signup" className="text-sm text-blue-500 hover:underline">
-            Need an account? Sign up
-          </Link>
+    <AuthCard
+      title="UniShelf"
+      description="Sign in to your account"
+      footerText="Need an account?"
+      footerHref="/signup"
+      footerLinkLabel="Sign up"
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
-      </div>
-    </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <Button type="submit" className="w-full">
+          Login
+        </Button>
+      </form>
+    </AuthCard>
   );
 }

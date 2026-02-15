@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Resource, ApiError } from '@/types';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { Resource } from '@/types';
 
 interface ResourceState {
   items: Resource[];
@@ -31,7 +31,7 @@ export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: 
       }
 
       return await response.json();
-    } catch (error) {
+    } catch {
       return rejectWithValue('Network error');
     }
   }
@@ -56,7 +56,7 @@ export const uploadResource = createAsyncThunk<Resource, FormData, { rejectValue
       }
 
       return await response.json();
-    } catch (error) {
+    } catch {
       return rejectWithValue('Network error');
     }
   }
@@ -86,7 +86,7 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
+    } catch {
       return rejectWithValue('Network error');
     }
   }

@@ -1,11 +1,16 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { AuthResponse, ApiError } from '@/types';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { AuthResponse } from '@/types';
 
 interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+}
+
+interface RegisterPayload {
+  email: string;
+  password: string;
 }
 
 const initialState: AuthState = {
@@ -33,13 +38,13 @@ export const loginUser = createAsyncThunk<AuthResponse, FormData, { rejectValue:
       const data = await response.json();
       localStorage.setItem('token', data.access_token);
       return data;
-    } catch (error) {
+    } catch {
       return rejectWithValue('Network error');
     }
   }
 );
 
-export const registerUser = createAsyncThunk<void, any, { rejectValue: string }>(
+export const registerUser = createAsyncThunk<void, RegisterPayload, { rejectValue: string }>(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
@@ -53,7 +58,7 @@ export const registerUser = createAsyncThunk<void, any, { rejectValue: string }>
         const errorData = await response.json();
         return rejectWithValue(errorData.detail || 'Registration failed');
       }
-    } catch (error) {
+    } catch {
       return rejectWithValue('Network error');
     }
   }

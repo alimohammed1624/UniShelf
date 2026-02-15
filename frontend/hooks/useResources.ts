@@ -56,7 +56,7 @@ export const useResources = () => {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return true;
-    } catch (err) {
+    } catch {
       return false;
     }
   };
@@ -72,7 +72,7 @@ export const useResources = () => {
       });
       
       await promise;
-    } catch (err) {
+    } catch {
       // Error handled by toast
     }
   };

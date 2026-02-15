@@ -19,8 +19,9 @@ venv/
 .Python
 .vscode/
 
-# Python build artifacts
 *.egg-info/
+bun.lock
 uv.lock
+
 dist/
 build/
