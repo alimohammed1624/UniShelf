@@ -15,7 +15,10 @@ export default function Dashboard() {
     setFile, 
     fileInputRef, 
     uploadResource, 
-    downloadResource, 
+    downloadResource,
+    editResource,
+    deleteResource,
+    changeFile,
     removeFile, 
     logout 
   } = useResources();
@@ -71,6 +74,9 @@ export default function Dashboard() {
           resources={resources}
           loading={loading}
           onDownload={downloadResource}
+          onEdit={editResource}
+          onDelete={deleteResource}
+          onChangeFile={changeFile}
         />
       </div>
     </main>

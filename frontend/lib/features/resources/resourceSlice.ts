@@ -92,6 +92,80 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
   }
 );
 
+export const editResource = createAsyncThunk<Resource, { id: number; formData: FormData }, { rejectValue: string }>(
+  'resources/edit',
+  async ({ id, formData }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.detail || 'Edit failed');
+      }
+
+      return await response.json();
+    } catch {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const deleteResource = createAsyncThunk<number, number, { rejectValue: string }>(
+  'resources/delete',
+  async (id, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.detail || 'Delete failed');
+      }
+
+      return id;
+    } catch {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const changeResourceFile = createAsyncThunk<Resource, { id: number; formData: FormData }, { rejectValue: string }>(
+  'resources/changeFile',
+  async ({ id, formData }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}/file`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.detail || 'File change failed');
+      }
+
+      return await response.json();
+    } catch {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
 
 const resourceSlice = createSlice({
   name: 'resources',
@@ -128,6 +202,29 @@ const resourceSlice = createSlice({
       .addCase(uploadResource.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Upload failed';
+      })
+      // Edit
+      .addCase(editResource.fulfilled, (state, action) => {
+        const index = state.items.findIndex((r) => r.id === action.payload.id);
+        if (index !== -1) state.items[index] = action.payload;
+      })
+      .addCase(editResource.rejected, (state, action) => {
+        state.error = action.payload || 'Edit failed';
+      })
+      // Delete
+      .addCase(deleteResource.fulfilled, (state, action) => {
+        state.items = state.items.filter((r) => r.id !== action.payload);
+      })
+      .addCase(deleteResource.rejected, (state, action) => {
+        state.error = action.payload || 'Delete failed';
+      })
+      // Change file
+      .addCase(changeResourceFile.fulfilled, (state, action) => {
+        const index = state.items.findIndex((r) => r.id === action.payload.id);
+        if (index !== -1) state.items[index] = action.payload;
+      })
+      .addCase(changeResourceFile.rejected, (state, action) => {
+        state.error = action.payload || 'File change failed';
       });
   },
 });
