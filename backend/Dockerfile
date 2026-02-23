@@ -1,20 +1,26 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+FROM python:3.12-alpine
+LABEL author=unishelf version=0.1
+ENV PYTHONUNBUFFERED=1
 
-# Set the working directory in the container
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml .
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --no-install-project --no-dev
 
-# Copy the rest of the application code
-COPY . .
+COPY . /app
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Expose port 8000
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["./entrypoint.sh"]

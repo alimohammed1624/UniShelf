@@ -4,17 +4,20 @@ UniShelf is a centralized academic resource sharing platform designed for univer
 
 ## Tech Stack
 
-*   **Frontend:** Next.js (React), Tailwind CSS
+*   **Frontend:** Next.js 15+ (React), Tailwind CSS
 *   **Backend:** FastAPI (Python), SQLAlchemy
-*   **Database:** PostgreSQL (with SQLite fallback for local/PoC development)
+*   **Database:** PostgreSQL
+*   **Storage:** MinIO (S3-compatible object storage)
+*   **Proxy:** Nginx (Reverse proxy, caching, compression)
 *   **Authentication:** JWT (JSON Web Tokens)
 *   **Infrastructure:** Docker, Docker Compose
+*   **Package Managers:** Bun (Frontend), uv (Backend)
 
 ## Prerequisites
 
-*   **Docker & Docker Compose** (Recommended for full stack experience)
-*   **Node.js** (v18+) & **npm** (for local frontend)
-*   **Python** (v3.9+) (for local backend)
+*   **Docker & Docker Compose** (Recommended for the full stack experience)
+*   **Bun** (v1.0+) (for local frontend development)
+*   **uv** (for local backend development)
 
 ## Getting Started
 
@@ -30,12 +33,14 @@ UniShelf is a centralized academic resource sharing platform designed for univer
     ```bash
     docker-compose up --build
     ```
-    This will start:
+    This will start the entire stack:
+    *   **Web App (Nginx):** http://localhost:8000
+    *   **Frontend (Next.js):** http://localhost:3000 (Direct access)
+    *   **Backend API:** http://localhost:8000/api
+    *   **MinIO Console:** http://localhost:9001
     *   **PostgreSQL Database:** Port 5432
-    *   **Backend API:** http://localhost:8000
-    *   **Frontend App:** http://localhost:3000
 
-### Option 2: Local Development (Without Docker)
+### Option 2: Local Development
 
 #### Backend
 
@@ -44,22 +49,16 @@ UniShelf is a centralized academic resource sharing platform designed for univer
     cd backend
     ```
 
-2.  Create a virtual environment and activate it:
+2.  Install dependencies using `uv` (creates virtual environment automatically):
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    uv sync
     ```
 
-3.  Install dependencies:
+3.  Run the development server:
     ```bash
-    pip install -r requirements.txt
+    uv run fastapi dev app/main.py
     ```
-
-4.  Run the server:
-    ```bash
-    python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    ```
-    *   Note: By default, it uses SQLite (`unishelf.db`). To use Postgres, set the `DATABASE_URL` environment variable.
+    The API will be available at http://localhost:8000.
 
 #### Frontend
 
@@ -68,44 +67,38 @@ UniShelf is a centralized academic resource sharing platform designed for univer
     cd frontend
     ```
 
-2.  Install dependencies:
+2.  Install dependencies using `bun`:
     ```bash
-    npm install
+    bun install
     ```
 
-3.  Run the development server:
+3.  Run the development server (configured with Turbopack for speed):
     ```bash
-    npm run dev
+    bun run dev
     ```
     The app will be available at http://localhost:3000.
 
 ## Usage
 
-1.  **Register:**
-    *   Go to http://localhost:3000.
-    *   Click "Need an account? Register".
-    *   Enter a university email (must end in `.edu` or similar for validation logic) and password.
+1.  **Register/Login:**
+    *   Access the app at http://localhost:8000.
+    *   Create an account or log in with existing credentials.
 
-2.  **Login:**
-    *   Use your registered credentials to log in.
-
-3.  **Dashboard:**
-    *   **Upload:** Use the upload form to add a new resource (PDFs recommended for PoC).
-    *   **View:** See the list of uploaded resources below the upload form.
-
-## API Documentation
-
-Once the backend is running, you can access the interactive API documentation (Swagger UI) at:
-
-*   http://localhost:8000/docs
+2.  **Dashboard:**
+    *   **Upload:** Use the "Upload Resource" form.
+        *   Click **"Choose File"** to select a document.
+        *   The button changes to a red **"Remove File"** button if you need to change your selection.
+        *   Enter a title and description, then click **"Upload"**.
+    *   **Download:** Browse the list of available resources and click **"Download"** to retrieve files.
 
 ## Project Structure
 
-*   `backend/`: FastAPI application code.
+*   `backend/`: FastAPI application code managed with `uv`.
     *   `app/`: Main application logic (models, schemas, auth, endpoints).
-*   `frontend/`: Next.js application code.
-    *   `app/`: App router pages (Login, Dashboard).
-*   `unishelf/`: Project documentation (Phase 1 & Phase 2 docs).
+*   `frontend/`: Next.js application code managed with `bun`.
+    *   `app/`: App router pages (Login, Dashboard, Signup).
+*   `nginx/`: Nginx configuration for reverse proxying.
+*   `data/`: Persistent data for databases (gitignored).
 *   `docker-compose.yml`: Docker orchestration configuration.
 
 ## Authors
