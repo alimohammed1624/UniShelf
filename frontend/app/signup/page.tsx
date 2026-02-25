@@ -12,6 +12,7 @@ import { AuthCard } from '@/components/auth/auth-card';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const dispatch = useAppDispatch();
@@ -26,7 +27,7 @@ export default function SignupPage() {
     }
 
     try {
-      const promise = dispatch(registerUser({ email, password })).unwrap();
+      const promise = dispatch(registerUser({ email, password, full_name: fullName })).unwrap();
       
       toast.promise(promise, {
         loading: 'Creating account...',
@@ -58,6 +59,17 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@university.edu"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Full Name</Label>
+          <Input
+            id="fullName"
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Your full name"
             required
           />
         </div>
