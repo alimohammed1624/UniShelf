@@ -13,6 +13,15 @@ const initialState: ResourceState = {
   error: null,
 };
 
+// Helper to extract error message from FastAPI/Pydantic responses
+function extractErrorMessage(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
+    return detail[0].msg;
+  }
+  return fallback;
+}
+
 // Async Thunks
 export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: string }>(
   'resources/fetchAll',
@@ -27,7 +36,7 @@ export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: 
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Failed to fetch resources');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to fetch resources'));
       }
 
       return await response.json();
@@ -52,7 +61,7 @@ export const uploadResource = createAsyncThunk<Resource, FormData, { rejectValue
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Upload failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Upload failed'));
       }
 
       return await response.json();
@@ -92,22 +101,23 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
   }
 );
 
-export const editResource = createAsyncThunk<Resource, { id: number; formData: FormData }, { rejectValue: string }>(
+export const editResource = createAsyncThunk<Resource, { id: number; title: string; description: string; is_public: boolean }, { rejectValue: string }>(
   'resources/edit',
-  async ({ id, formData }, { rejectWithValue }) => {
+  async ({ id, title, description, is_public }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({ title, description, is_public }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Edit failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Edit failed'));
       }
 
       return await response.json();
@@ -131,7 +141,7 @@ export const deleteResource = createAsyncThunk<number, number, { rejectValue: st
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Delete failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Delete failed'));
       }
 
       return id;
@@ -156,7 +166,7 @@ export const changeResourceFile = createAsyncThunk<Resource, { id: number; formD
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'File change failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'File change failed'));
       }
 
       return await response.json();

@@ -29,6 +29,8 @@ import {
 interface ResourceTableCardProps {
   resources: Resource[];
   loading: boolean;
+  currentUserId: number | null;
+  currentUserRole: number;
   onDownload: (id: number, title: string) => void;
   onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
@@ -38,11 +40,15 @@ interface ResourceTableCardProps {
 export function ResourceTableCard({
   resources,
   loading,
+  currentUserId,
+  currentUserRole,
   onDownload,
   onEdit,
   onDelete,
   onChangeFile,
 }: ResourceTableCardProps) {
+  const isOwnerOrAdmin = (resource: Resource) =>
+    resource.owner_id === currentUserId || currentUserRole >= 2;
   // Edit modal state
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -60,7 +66,7 @@ export function ResourceTableCard({
     setEditingResource(resource);
     setEditTitle(resource.title);
     setEditDescription(resource.description || '');
-    setEditVisibility(resource.visibility || 'public');
+    setEditVisibility(resource.is_public ? 'public' : 'private');
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -114,22 +120,26 @@ export function ResourceTableCard({
                   <TableRow key={resource.id}>
                     <TableCell className="font-medium">{resource.title}</TableCell>
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
-                    <TableCell className="capitalize">{resource.visibility}</TableCell>
+                    <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell>User #{resource.uploader_id}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
                           Download
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                          Change
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                          Delete
-                        </Button>
+                        {isOwnerOrAdmin(resource) && (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+                              Change
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+                              Delete
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

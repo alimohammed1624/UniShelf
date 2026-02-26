@@ -10,7 +10,7 @@ import {
   deleteResource as deleteResourceAction,
   changeResourceFile as changeResourceFileAction
 } from '../lib/features/resources/resourceSlice';
-import { logout as logoutAction } from '../lib/features/auth/authSlice';
+import { logout as logoutAction, fetchCurrentUser } from '../lib/features/auth/authSlice';
 
 export const useResources = () => {
   const dispatch = useAppDispatch();
@@ -28,7 +28,8 @@ export const useResources = () => {
       router.push('/login');
       return;
     }
-    // Only fetch if empty or you want to refresh on mount
+    // Fetch current user and resources
+    dispatch(fetchCurrentUser());
     dispatch(fetchResourcesAction());
   }, [dispatch, router]);
 
@@ -88,13 +89,10 @@ export const useResources = () => {
   };
 
   const editResource = async (resourceId: number, title: string, description: string, visibility: string) => {
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('visibility', visibility);
+    const is_public = visibility === 'public';
 
     try {
-      const promise = dispatch(editResourceAction({ id: resourceId, formData })).unwrap();
+      const promise = dispatch(editResourceAction({ id: resourceId, title, description, is_public })).unwrap();
 
       toast.promise(promise, {
         loading: 'Saving changes...',
