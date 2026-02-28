@@ -109,6 +109,7 @@ export function ResourceTableCard({
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
+                  <TableHead>Filename</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
@@ -119,6 +120,7 @@ export function ResourceTableCard({
                 {resources.map((resource) => (
                   <TableRow key={resource.id}>
                     <TableCell className="font-medium">{resource.title}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-xs">{resource.filename ?? '—'}</TableCell>
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell>User #{resource.uploader_id}</TableCell>
@@ -192,7 +194,7 @@ export function ResourceTableCard({
 
             <AlertDialogFooter>
               <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-              <AlertDialogAction type="submit">Save</AlertDialogAction>
+              <Button type="submit">Save</Button>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>
@@ -236,7 +238,7 @@ export function ResourceTableCard({
 
             <AlertDialogFooter>
               <AlertDialogCancel type="button" onClick={() => { setChangingResource(null); setChangeFile(null); }}>Cancel</AlertDialogCancel>
-              <AlertDialogAction type="submit">Upload New File</AlertDialogAction>
+              <Button type="submit">Upload New File</Button>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>
