@@ -17,6 +17,7 @@ from .helpers import (
     create_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+from app.utils.metrics import AUTH_ATTEMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +50,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         db.commit()
     except IntegrityError:
         db.rollback()
+        AUTH_ATTEMPTS.labels(method="register", status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
         )
 
     db.refresh(db_user)
+    AUTH_ATTEMPTS.labels(method="register", status="success").inc()
     return db_user
 
 
@@ -66,6 +69,7 @@ def login_for_access_token(
     user = db.query(User).filter(User.email == form_data.username.lower().strip()).first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
+        AUTH_ATTEMPTS.labels(method="login", status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -74,6 +78,7 @@ def login_for_access_token(
 
     # Check if user is banned
     if not user.is_active:
+        AUTH_ATTEMPTS.labels(method="login", status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account has been suspended",
@@ -88,4 +93,5 @@ def login_for_access_token(
         },
         expires_delta=access_token_expires,
     )
+    AUTH_ATTEMPTS.labels(method="login", status="success").inc()
     return {"access_token": access_token, "token_type": "bearer"}
