@@ -11,6 +11,7 @@ interface AuthState {
 interface RegisterPayload {
   email: string;
   password: string;
+  full_name: string;
 }
 
 const initialState: AuthState = {
@@ -25,7 +26,7 @@ export const loginUser = createAsyncThunk<AuthResponse, FormData, { rejectValue:
   'auth/login',
   async (formData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/token`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/token`, {
         method: 'POST',
         body: formData, // Sending as FormData for OAuth2PasswordRequestForm
       });
@@ -48,7 +49,7 @@ export const registerUser = createAsyncThunk<void, RegisterPayload, { rejectValu
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/register`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),

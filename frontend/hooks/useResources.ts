@@ -40,7 +40,7 @@ export const useResources = () => {
     formData.append('title', title);
     formData.append('description', description);
     formData.append('file', file);
-    formData.append('visibility', 'public');
+    formData.append('is_public', 'true');
 
     try {
       const promise = dispatch(uploadResourceAction(formData)).unwrap();

@@ -13,6 +13,7 @@ dependencies = [
     "bcrypt==4.0.1",
     "minio",
     "pydantic-settings>=2.12.0",
+    "email-validator",
 ]
 
 [build-system]
