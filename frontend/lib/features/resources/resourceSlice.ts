@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { Resource } from '@/types';
+import { assignTagsToResource, removeTagFromResource } from '../tags/tagSlice';
 
 interface ResourceState {
   items: Resource[];
@@ -23,12 +24,21 @@ function extractErrorMessage(detail: unknown, fallback: string): string {
 }
 
 // Async Thunks
-export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: string }>(
+export interface SearchParams {
+  q?: string;
+  tags?: string;
+}
+
+export const fetchResources = createAsyncThunk<Resource[], SearchParams | void, { rejectValue: string }>(
   'resources/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
+      const searchParams = new URLSearchParams();
+      if (params?.q) searchParams.set('q', params.q);
+      if (params?.tags) searchParams.set('tags', params.tags);
+      const qs = searchParams.toString();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources${qs ? `?${qs}` : ''}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -235,6 +245,17 @@ const resourceSlice = createSlice({
       })
       .addCase(changeResourceFile.rejected, (state, action) => {
         state.error = action.payload || 'File change failed';
+      })
+      // Tag assignment (update resource tags in-place)
+      .addCase(assignTagsToResource.fulfilled, (state, action) => {
+        const idx = state.items.findIndex((r) => r.id === action.payload.resourceId);
+        if (idx !== -1) state.items[idx].tags = action.payload.tags;
+      })
+      .addCase(removeTagFromResource.fulfilled, (state, action) => {
+        const idx = state.items.findIndex((r) => r.id === action.payload.resourceId);
+        if (idx !== -1) {
+          state.items[idx].tags = state.items[idx].tags.filter((t) => t.id !== action.payload.tagId);
+        }
       });
   },
 });

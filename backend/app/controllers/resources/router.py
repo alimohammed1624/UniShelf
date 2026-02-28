@@ -173,7 +173,10 @@ def list_resources(
     if q:
         # Escape SQL LIKE wildcards in user input
         escaped_q = q.replace("%", r"\%").replace("_", r"\_")
-        query = query.filter(Resource.title.ilike(f"%{escaped_q}%"))
+        pattern = f"%{escaped_q}%"
+        query = query.filter(
+            Resource.title.ilike(pattern) | Resource.filename.ilike(pattern)
+        )
 
     if hierarchy:
         validated_h = validate_hierarchy(hierarchy)

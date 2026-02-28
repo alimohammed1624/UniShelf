@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Resource } from '@/types';
+import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -31,10 +32,14 @@ interface ResourceTableCardProps {
   loading: boolean;
   currentUserId: number | null;
   currentUserRole: number;
+  allTags: Tag[];
   onDownload: (id: number, title: string) => void;
   onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
   onChangeFile: (id: number, file: File) => Promise<boolean>;
+  onCreateTag: (name: string) => Promise<Tag | null>;
+  onAssignTags: (resourceId: number, tagIds: number[]) => Promise<boolean>;
+  onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
 }
 
 export function ResourceTableCard({
@@ -42,10 +47,14 @@ export function ResourceTableCard({
   loading,
   currentUserId,
   currentUserRole,
+  allTags,
   onDownload,
   onEdit,
   onDelete,
   onChangeFile,
+  onCreateTag,
+  onAssignTags,
+  onRemoveTag,
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -61,6 +70,10 @@ export function ResourceTableCard({
   // Change file modal state
   const [changingResource, setChangingResource] = useState<Resource | null>(null);
   const [changeFile, setChangeFile] = useState<File | null>(null);
+
+  // Tags modal state
+  const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
+  const [newTagName, setNewTagName] = useState('');
 
   const openEditModal = (resource: Resource) => {
     setEditingResource(resource);
@@ -92,6 +105,49 @@ export function ResourceTableCard({
     }
   };
 
+  const handleCreateAndAssignTag = async () => {
+    if (!taggingResource || !newTagName.trim()) return;
+    const tag = await onCreateTag(newTagName.trim());
+    if (tag) {
+      const currentIds = taggingResource.tags.map((t) => t.id);
+      const success = await onAssignTags(taggingResource.id, [...currentIds, tag.id]);
+      if (success) {
+        // Update local reference so the modal reflects the change
+        const updated = resources.find((r) => r.id === taggingResource.id);
+        if (updated) setTaggingResource(updated);
+      }
+    }
+    setNewTagName('');
+  };
+
+  const handleAssignExistingTag = async (tagId: number) => {
+    if (!taggingResource) return;
+    const currentIds = taggingResource.tags.map((t) => t.id);
+    if (currentIds.includes(tagId)) return; // already assigned
+    const success = await onAssignTags(taggingResource.id, [...currentIds, tagId]);
+    if (success) {
+      const updated = resources.find((r) => r.id === taggingResource.id);
+      if (updated) setTaggingResource(updated);
+    }
+  };
+
+  const handleRemoveTag = async (tagId: number) => {
+    if (!taggingResource) return;
+    const success = await onRemoveTag(taggingResource.id, tagId);
+    if (success) {
+      const updated = resources.find((r) => r.id === taggingResource.id);
+      if (updated) setTaggingResource(updated);
+    }
+  };
+
+  // Keep taggingResource in sync with resources list
+  const activeTaggingResource = taggingResource
+    ? resources.find((r) => r.id === taggingResource.id) ?? taggingResource
+    : null;
+  const availableTags = activeTaggingResource
+    ? allTags.filter((t) => !activeTaggingResource.tags.some((rt) => rt.id === t.id))
+    : [];
+
   return (
     <>
       <Card>
@@ -110,6 +166,7 @@ export function ResourceTableCard({
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Filename</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
@@ -121,6 +178,13 @@ export function ResourceTableCard({
                   <TableRow key={resource.id}>
                     <TableCell className="font-medium">{resource.title}</TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-xs">{resource.filename ?? '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {resource.tags.length > 0 ? resource.tags.map((tag) => (
+                          <Badge key={tag.id} variant="secondary" className="text-xs">{tag.name}</Badge>
+                        )) : <span className="text-xs text-muted-foreground">—</span>}
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell>User #{resource.uploader_id}</TableCell>
@@ -136,6 +200,9 @@ export function ResourceTableCard({
                             </Button>
                             <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
                               Change
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+                              Tags
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
                               Delete
@@ -241,6 +308,81 @@ export function ResourceTableCard({
               <Button type="submit">Upload New File</Button>
             </AlertDialogFooter>
           </form>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Tags Modal ── */}
+      <AlertDialog open={!!taggingResource} onOpenChange={(open) => { if (!open) { setTaggingResource(null); setNewTagName(''); } }}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Manage Tags</AlertDialogTitle>
+            <AlertDialogDescription>
+              Add or remove tags for <span className="font-medium">{activeTaggingResource?.title}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* Current tags */}
+          <div className="space-y-3 py-2">
+            <Label className="text-xs text-muted-foreground">Current Tags</Label>
+            <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+              {activeTaggingResource && activeTaggingResource.tags.length > 0 ? (
+                activeTaggingResource.tags.map((tag) => (
+                  <Badge key={tag.id} variant="secondary" className="gap-1 pr-1">
+                    {tag.name}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag.id)}
+                      className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 text-xs leading-none"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-xs text-muted-foreground">No tags assigned</span>
+              )}
+            </div>
+
+            {/* Add existing tag */}
+            {availableTags.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Add Existing Tag</Label>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                  {availableTags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-accent text-xs"
+                      onClick={() => handleAssignExistingTag(tag.id)}
+                    >
+                      + {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Create new tag */}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Create &amp; Add New Tag</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Tag name…"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateAndAssignTag(); } }}
+                />
+                <Button type="button" size="sm" onClick={handleCreateAndAssignTag} disabled={!newTagName.trim()}>
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Done</AlertDialogCancel>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
