@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useResources } from '@/hooks/useResources';
+import { useAppSelector } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { LogoutConfirmDialog } from '@/components/dashboard/logout-confirm-dialog';
 import { ResourceUploadCard } from '@/components/dashboard/resource-upload-card';
@@ -15,10 +16,15 @@ export default function Dashboard() {
     setFile, 
     fileInputRef, 
     uploadResource, 
-    downloadResource, 
+    downloadResource,
+    editResource,
+    deleteResource,
+    changeFile,
     removeFile, 
     logout 
   } = useResources();
+
+  const { user } = useAppSelector((state) => state.auth);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,7 +76,12 @@ export default function Dashboard() {
         <ResourceTableCard
           resources={resources}
           loading={loading}
+          currentUserId={user?.id ?? null}
+          currentUserRole={user?.role ?? 0}
           onDownload={downloadResource}
+          onEdit={editResource}
+          onDelete={deleteResource}
+          onChangeFile={changeFile}
         />
       </div>
     </main>

@@ -5,9 +5,12 @@ import { useAppDispatch, useAppSelector } from '../lib/hooks';
 import { 
   fetchResources as fetchResourcesAction, 
   uploadResource as uploadResourceAction,
-  downloadResource as downloadResourceAction 
+  downloadResource as downloadResourceAction,
+  editResource as editResourceAction,
+  deleteResource as deleteResourceAction,
+  changeResourceFile as changeResourceFileAction
 } from '../lib/features/resources/resourceSlice';
-import { logout as logoutAction } from '../lib/features/auth/authSlice';
+import { logout as logoutAction, fetchCurrentUser } from '../lib/features/auth/authSlice';
 
 export const useResources = () => {
   const dispatch = useAppDispatch();
@@ -25,7 +28,8 @@ export const useResources = () => {
       router.push('/login');
       return;
     }
-    // Only fetch if empty or you want to refresh on mount
+    // Fetch current user and resources
+    dispatch(fetchCurrentUser());
     dispatch(fetchResourcesAction());
   }, [dispatch, router]);
 
@@ -84,6 +88,62 @@ export const useResources = () => {
     }
   };
 
+  const editResource = async (resourceId: number, title: string, description: string, visibility: string) => {
+    const is_public = visibility === 'public';
+
+    try {
+      const promise = dispatch(editResourceAction({ id: resourceId, title, description, is_public })).unwrap();
+
+      toast.promise(promise, {
+        loading: 'Saving changes...',
+        success: 'Resource updated',
+        error: (err) => typeof err === 'string' ? err : 'Edit failed'
+      });
+
+      await promise;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const deleteResourceById = async (resourceId: number) => {
+    try {
+      const promise = dispatch(deleteResourceAction(resourceId)).unwrap();
+
+      toast.promise(promise, {
+        loading: 'Deleting...',
+        success: 'Resource deleted',
+        error: (err) => typeof err === 'string' ? err : 'Delete failed'
+      });
+
+      await promise;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const changeFile = async (resourceId: number, newFile: File) => {
+    const formData = new FormData();
+    formData.append('file', newFile);
+
+    try {
+      const promise = dispatch(changeResourceFileAction({ id: resourceId, formData })).unwrap();
+
+      toast.promise(promise, {
+        loading: 'Replacing file...',
+        success: 'File replaced',
+        error: (err) => typeof err === 'string' ? err : 'File change failed'
+      });
+
+      await promise;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const logout = () => {
     dispatch(logoutAction());
     router.push('/login');
@@ -100,6 +160,9 @@ export const useResources = () => {
     fetchResources,
     uploadResource,
     downloadResource,
+    editResource,
+    deleteResource: deleteResourceById,
+    changeFile,
     removeFile,
     logout,
   };

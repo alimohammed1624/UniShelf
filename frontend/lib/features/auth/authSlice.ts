@@ -1,8 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { AuthResponse } from '@/types';
+import { AuthResponse, User } from '@/types';
 
 interface AuthState {
   token: string | null;
+  user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -16,12 +17,44 @@ interface RegisterPayload {
 
 const initialState: AuthState = {
   token: null,
+  user: null,
   isAuthenticated: false,
   loading: false,
   error: null,
 };
 
+// Helper to extract error message from FastAPI/Pydantic responses
+function extractErrorMessage(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
+    return detail[0].msg;
+  }
+  return fallback;
+}
+
 // Async Thunks
+export const fetchCurrentUser = createAsyncThunk<User, void, { rejectValue: string }>(
+  'auth/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return rejectWithValue('No token');
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/users/me`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        return rejectWithValue('Failed to fetch user');
+      }
+
+      return await response.json();
+    } catch {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
 export const loginUser = createAsyncThunk<AuthResponse, FormData, { rejectValue: string }>(
   'auth/login',
   async (formData, { rejectWithValue }) => {
@@ -33,7 +66,7 @@ export const loginUser = createAsyncThunk<AuthResponse, FormData, { rejectValue:
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Login failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Login failed'));
       }
 
       const data = await response.json();
@@ -57,7 +90,7 @@ export const registerUser = createAsyncThunk<void, RegisterPayload, { rejectValu
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.detail || 'Registration failed');
+        return rejectWithValue(extractErrorMessage(errorData.detail, 'Registration failed'));
       }
     } catch {
       return rejectWithValue('Network error');
@@ -71,6 +104,7 @@ const authSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.token = null;
+      state.user = null;
       state.isAuthenticated = false;
       state.error = null;
       if (typeof window !== 'undefined') {
@@ -117,6 +151,13 @@ const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Registration failed';
+      })
+      // Fetch current user
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+      })
+      .addCase(fetchCurrentUser.rejected, (state) => {
+        state.user = null;
       });
   },
 });
