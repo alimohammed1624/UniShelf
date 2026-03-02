@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -45,6 +46,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
