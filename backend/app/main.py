@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.models import Base
 from app.database import engine
 from app.utils.minio_client import ensure_bucket_exists
@@ -39,3 +40,10 @@ app.include_router(users_router)
 app.include_router(resources_router)
 app.include_router(tags_router)
 app.include_router(admin_router)
+
+# Prometheus metrics — must be set up after all routers are registered
+Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    excluded_handlers=["/metrics"],
+).instrument(app).expose(app, endpoint="/metrics")

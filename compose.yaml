@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -45,6 +46,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
@@ -56,6 +58,7 @@ services:
       - frontend
       - backend
       - minio
+      - grafana
     restart: unless-stopped
 
   minio:
@@ -72,3 +75,27 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    user: "root"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    user: "root"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://localhost:${APP_PORT:-8000}/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    depends_on:
+      - prometheus
+    restart: unless-stopped

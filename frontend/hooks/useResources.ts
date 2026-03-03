@@ -10,11 +10,18 @@ import {
   deleteResource as deleteResourceAction,
   changeResourceFile as changeResourceFileAction
 } from '../lib/features/resources/resourceSlice';
+import {
+  fetchTags as fetchTagsAction,
+  createTag as createTagAction,
+  assignTagsToResource as assignTagsAction,
+  removeTagFromResource as removeTagAction,
+} from '../lib/features/tags/tagSlice';
 import { logout as logoutAction, fetchCurrentUser } from '../lib/features/auth/authSlice';
 
 export const useResources = () => {
   const dispatch = useAppDispatch();
   const { items: resources, loading, error } = useAppSelector((state) => state.resources);
+  const { items: allTags } = useAppSelector((state) => state.tags);
   
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,10 +38,11 @@ export const useResources = () => {
     // Fetch current user and resources
     dispatch(fetchCurrentUser());
     dispatch(fetchResourcesAction());
+    dispatch(fetchTagsAction());
   }, [dispatch, router]);
 
-  const fetchResources = () => {
-    dispatch(fetchResourcesAction());
+  const fetchResources = (params?: { q?: string; tags?: string }) => {
+    dispatch(fetchResourcesAction(params));
   };
 
   const uploadResource = async (title: string, description: string) => {
@@ -144,6 +152,46 @@ export const useResources = () => {
     }
   };
 
+  const createTag = async (name: string) => {
+    try {
+      const result = await dispatch(createTagAction({ name })).unwrap();
+      return result;
+    } catch {
+      toast.error('Failed to create tag');
+      return null;
+    }
+  };
+
+  const assignTags = async (resourceId: number, tagIds: number[]) => {
+    try {
+      const promise = dispatch(assignTagsAction({ resourceId, tagIds })).unwrap();
+      toast.promise(promise, {
+        loading: 'Saving tags...',
+        success: 'Tags updated',
+        error: (err) => typeof err === 'string' ? err : 'Failed to assign tags'
+      });
+      await promise;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const removeTag = async (resourceId: number, tagId: number) => {
+    try {
+      const promise = dispatch(removeTagAction({ resourceId, tagId })).unwrap();
+      toast.promise(promise, {
+        loading: 'Removing tag...',
+        success: 'Tag removed',
+        error: (err) => typeof err === 'string' ? err : 'Failed to remove tag'
+      });
+      await promise;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const logout = () => {
     dispatch(logoutAction());
     router.push('/login');
@@ -154,6 +202,7 @@ export const useResources = () => {
     resources,
     loading,
     error,
+    allTags,
     file,
     setFile,
     fileInputRef,
@@ -163,6 +212,9 @@ export const useResources = () => {
     editResource,
     deleteResource: deleteResourceById,
     changeFile,
+    createTag,
+    assignTags,
+    removeTag,
     removeFile,
     logout,
   };

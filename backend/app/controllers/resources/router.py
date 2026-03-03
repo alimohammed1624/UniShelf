@@ -24,6 +24,7 @@ from app.utils.db_helpers import (
 )
 from .schemas import ResourceSchema, ResourceUpdate, VisibilityCreate, VisibilitySchema, TagBrief
 from app.config import settings
+from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ async def upload_resource(
 
     # Upload to MinIO
     object_key = await upload_file(file, object_name)
+    UPLOAD_SIZE.observe(file_size)
 
     # Save metadata to database
     db_resource = Resource(
@@ -105,6 +107,7 @@ async def upload_resource(
             delete_file(object_key)
         except Exception:
             logger.error(f"Failed to clean up MinIO object {object_key} after DB error")
+        UPLOAD_COUNT.labels(status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save resource metadata",
@@ -115,12 +118,14 @@ async def upload_resource(
             delete_file(object_key)
         except Exception:
             logger.error(f"Failed to clean up MinIO object {object_key} after DB error")
+        UPLOAD_COUNT.labels(status="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save resource",
         )
 
     db.refresh(db_resource)
+    UPLOAD_COUNT.labels(status="success").inc()
     return db_resource
 
 
@@ -173,7 +178,10 @@ def list_resources(
     if q:
         # Escape SQL LIKE wildcards in user input
         escaped_q = q.replace("%", r"\%").replace("_", r"\_")
-        query = query.filter(Resource.title.ilike(f"%{escaped_q}%"))
+        pattern = f"%{escaped_q}%"
+        query = query.filter(
+            Resource.title.ilike(pattern) | Resource.filename.ilike(pattern)
+        )
 
     if hierarchy:
         validated_h = validate_hierarchy(hierarchy)
@@ -356,6 +364,7 @@ def download_resource(
 
     # Stream file in chunks from MinIO
     chunk_generator = stream_download(resource.file_path)
+    DOWNLOAD_COUNT.inc()
 
     download_filename = sanitize_filename(resource.filename or "download")
     headers = {

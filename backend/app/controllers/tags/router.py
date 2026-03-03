@@ -34,7 +34,7 @@ def list_tags(
 @router.post("", response_model=TagSchema, status_code=status.HTTP_201_CREATED)
 def create_tag(
     tag: TagCreate,
-    current_user=Depends(require_role(UserRole.ADMIN)),
+    current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     db_tag = Tag(

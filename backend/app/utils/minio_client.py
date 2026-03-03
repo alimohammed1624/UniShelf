@@ -11,6 +11,7 @@ from minio.error import S3Error
 from fastapi import UploadFile, HTTPException
 import logging
 from app.config import settings
+from app.utils.metrics import MINIO_OP_DURATION
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +80,14 @@ async def upload_file(
         file_size = len(file_content)
         await file.seek(0)
 
-        client.put_object(
-            bucket_name,
-            object_name,
-            io.BytesIO(file_content),
-            length=file_size,
-            content_type=file.content_type or "application/octet-stream",
-        )
+        with MINIO_OP_DURATION.labels(operation="upload").time():
+            client.put_object(
+                bucket_name,
+                object_name,
+                io.BytesIO(file_content),
+                length=file_size,
+                content_type=file.content_type or "application/octet-stream",
+            )
 
         logger.info(f"Uploaded file: {object_name} ({file_size} bytes)")
         return object_name
@@ -113,7 +115,8 @@ def stream_download(
     client = get_minio_client()
     response = None
     try:
-        response = client.get_object(bucket_name, object_name)
+        with MINIO_OP_DURATION.labels(operation="download").time():
+            response = client.get_object(bucket_name, object_name)
         while True:
             chunk = response.read(chunk_size)
             if not chunk:
@@ -196,7 +199,8 @@ def delete_file(object_name: str, bucket_name: str = MINIO_BUCKET_NAME) -> None:
     client = get_minio_client()
 
     try:
-        client.remove_object(bucket_name, object_name)
+        with MINIO_OP_DURATION.labels(operation="delete").time():
+            client.remove_object(bucket_name, object_name)
         logger.info(f"Deleted file: {object_name}")
 
     except S3Error as e:

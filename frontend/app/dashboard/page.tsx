@@ -6,6 +6,7 @@ import { useAppSelector } from '@/lib/hooks';
 import { Button } from '@/components/ui/button';
 import { LogoutConfirmDialog } from '@/components/dashboard/logout-confirm-dialog';
 import { ResourceUploadCard } from '@/components/dashboard/resource-upload-card';
+import { ResourceSearchBar } from '@/components/dashboard/resource-search-bar';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 
 export default function Dashboard() {
@@ -14,12 +15,17 @@ export default function Dashboard() {
     loading, 
     file, 
     setFile, 
-    fileInputRef, 
+    fileInputRef,
+    fetchResources,
     uploadResource, 
     downloadResource,
     editResource,
     deleteResource,
     changeFile,
+    allTags,
+    createTag,
+    assignTags,
+    removeTag,
     removeFile, 
     logout 
   } = useResources();
@@ -73,15 +79,21 @@ export default function Dashboard() {
           onSubmit={handleUpload}
         />
 
+        <ResourceSearchBar onSearch={fetchResources} />
+
         <ResourceTableCard
           resources={resources}
           loading={loading}
           currentUserId={user?.id ?? null}
           currentUserRole={user?.role ?? 0}
+          allTags={allTags}
           onDownload={downloadResource}
           onEdit={editResource}
           onDelete={deleteResource}
           onChangeFile={changeFile}
+          onCreateTag={createTag}
+          onAssignTags={assignTags}
+          onRemoveTag={removeTag}
         />
       </div>
     </main>

@@ -1,12 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './features/auth/authSlice'
 import resourceReducer from './features/resources/resourceSlice'
+import tagReducer from './features/tags/tagSlice'
 
 export const makeStore = () => {
   return configureStore({
     reducer: {
       auth: authReducer,
       resources: resourceReducer,
+      tags: tagReducer,
     },
   })
 }
