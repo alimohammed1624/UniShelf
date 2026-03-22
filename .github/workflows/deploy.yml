@@ -1,0 +1,25 @@
+name: Deployment
+
+on:
+  push:
+    branches: [ prod ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Cleanup & build
+        run: |
+          cd /root/UniShelf
+          git stash
+          git checkout prod
+          git pull origin prod --rebase
+          git stash pop || true
+          docker compose down --remove-orphans
+          docker compose build --pull --progress plain
+
+      - name: Deploy
+        run: |
+          cd /root/UniShelf
+          docker compose up -d --quiet-pull --remove-orphans
