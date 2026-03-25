@@ -219,6 +219,7 @@ export default function SearchPage() {
               {chip}
               <button
                 type="button"
+                aria-label={`Remove tag ${chip}`}
                 onClick={() => setTagChips((prev) => prev.filter((c) => c !== chip))}
                 className="rounded-full hover:bg-muted"
               >
