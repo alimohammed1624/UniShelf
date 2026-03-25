@@ -1,14 +1,17 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import {
+  fetchResources,
   downloadResource,
   editResource,
   deleteResource,
   changeResourceFile,
 } from '@/lib/features/resources/resourceSlice';
 import {
+  fetchTags,
   createTag,
   assignTagsToResource,
   removeTagFromResource,
@@ -21,6 +24,11 @@ export default function BookmarksPage() {
   const { user } = useAppSelector((state) => state.auth);
   const bookmarkIds = useAppSelector((state) => state.bookmarks.ids);
   const { items: allTags } = useAppSelector((state) => state.tags);
+
+  useEffect(() => {
+    if (resources.length === 0) dispatch(fetchResources());
+    if (allTags.length === 0) dispatch(fetchTags());
+  }, [dispatch, resources.length, allTags.length]);
 
   const bookmarked = resources.filter((r) => bookmarkIds.includes(r.id));
 
