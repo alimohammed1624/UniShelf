@@ -33,7 +33,7 @@ export default function LoginPage() {
       });
       
       await promise;
-      router.push('/dashboard');
+      router.push('/my-resources');
     } catch {
       // Error handled by toast
     }

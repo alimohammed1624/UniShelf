@@ -1,27 +1,38 @@
-# Use official Bun runtime as a parent image
-FROM oven/bun:latest
-
-# Set the working directory
+# ── Stage 1: Install dependencies ──
+FROM oven/bun:latest AS deps
 WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile
 
-# Copy package.json and lock files
-COPY package*.json bun.lock* ./
-
-# Install dependencies
-RUN bun install
-
-# Copy the rest of the application code
+# ── Stage 2: Build the Next.js app ──
+FROM oven/bun:latest AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Set API URL at build time for Next.js
 ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Make entrypoint executable
-RUN chmod +x entrypoint.sh
+RUN bun run build
 
-# Expose port 3000
+# ── Final unified stage: supports both dev and prod modes ──
+FROM oven/bun:latest
+WORKDIR /app
+
+# Copy all dependencies and source code
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Copy the built output for production mode
+COPY --from=builder /app/.next ./.next
+
+# Copy and make entrypoint executable
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
 EXPOSE 3000
 
-# Start the application via entrypoint
-ENTRYPOINT ["./entrypoint.sh"]
+CMD ["./entrypoint.sh"]

@@ -1,12 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './features/auth/authSlice'
 import resourceReducer from './features/resources/resourceSlice'
+import bookmarksReducer from './features/bookmarks/bookmarksSlice'
 
 export const makeStore = () => {
   return configureStore({
     reducer: {
       auth: authReducer,
       resources: resourceReducer,
+      bookmarks: bookmarksReducer,
     },
   })
 }

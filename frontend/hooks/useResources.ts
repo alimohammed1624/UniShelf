@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '../lib/hooks';
 import { 
@@ -10,7 +9,6 @@ import {
   deleteResource as deleteResourceAction,
   changeResourceFile as changeResourceFileAction
 } from '../lib/features/resources/resourceSlice';
-import { logout as logoutAction, fetchCurrentUser } from '../lib/features/auth/authSlice';
 
 export const useResources = () => {
   const dispatch = useAppDispatch();
@@ -18,20 +16,10 @@ export const useResources = () => {
   
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    // Check auth via localStorage directly here or rely on auth state if initialized
-    // For now, let's keep the simple token check to redirect if missing
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    // Fetch current user and resources
-    dispatch(fetchCurrentUser());
     dispatch(fetchResourcesAction());
-  }, [dispatch, router]);
+  }, [dispatch]);
 
   const fetchResources = () => {
     dispatch(fetchResourcesAction());
@@ -144,12 +132,6 @@ export const useResources = () => {
     }
   };
 
-  const logout = () => {
-    dispatch(logoutAction());
-    router.push('/login');
-    toast.success('Logged out successfully');
-  };
-
   return {
     resources,
     loading,
@@ -164,6 +146,5 @@ export const useResources = () => {
     deleteResource: deleteResourceById,
     changeFile,
     removeFile,
-    logout,
   };
 };

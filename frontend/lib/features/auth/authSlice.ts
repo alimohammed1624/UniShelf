@@ -158,6 +158,8 @@ const authSlice = createSlice({
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.user = null;
+        state.isAuthenticated = false;
+        state.token = null;
       });
   },
 });
