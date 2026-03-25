@@ -1,5 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { AxiosError } from 'axios';
 import { AuthResponse, User } from '@/types';
+import api from '@/lib/api';
+import { extractErrorMessage } from '@/lib/apiUtils';
 
 interface AuthState {
   token: string | null;
@@ -23,34 +26,16 @@ const initialState: AuthState = {
   error: null,
 };
 
-// Helper to extract error message from FastAPI/Pydantic responses
-function extractErrorMessage(detail: unknown, fallback: string): string {
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
-    return detail[0].msg;
-  }
-  return fallback;
-}
-
 // Async Thunks
 export const fetchCurrentUser = createAsyncThunk<User, void, { rejectValue: string }>(
   'auth/fetchCurrentUser',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return rejectWithValue('No token');
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/users/me`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        return rejectWithValue('Failed to fetch user');
-      }
-
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.get<User>('/users/me');
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch user'));
     }
   }
 );
@@ -59,21 +44,12 @@ export const loginUser = createAsyncThunk<AuthResponse, FormData, { rejectValue:
   'auth/login',
   async (formData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/token`, {
-        method: 'POST',
-        body: formData, // Sending as FormData for OAuth2PasswordRequestForm
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Login failed'));
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.access_token);
-      return data;
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.post<AuthResponse>('/auth/token', formData);
+      localStorage.setItem('token', response.data.access_token);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Login failed'));
     }
   }
 );
@@ -82,18 +58,10 @@ export const registerUser = createAsyncThunk<void, RegisterPayload, { rejectValu
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Registration failed'));
-      }
-    } catch {
-      return rejectWithValue('Network error');
+      await api.post('/auth/register', userData);
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Registration failed'));
     }
   }
 );
@@ -158,6 +126,11 @@ const authSlice = createSlice({
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.user = null;
+        state.isAuthenticated = false;
+        state.token = null;
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+        }
       });
   },
 });

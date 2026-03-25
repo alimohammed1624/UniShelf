@@ -6,7 +6,6 @@ from typing import Optional
 class Settings(BaseSettings):
     # Application
     DEBUG: bool = False
-    APP_PORT: int = 8000
 
     # Database
     # These are optional because we prefer DATABASE_URL

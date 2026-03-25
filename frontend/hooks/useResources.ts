@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '../lib/hooks';
-import { 
-  fetchResources as fetchResourcesAction, 
+import {
+  fetchResources as fetchResourcesAction,
   uploadResource as uploadResourceAction,
   downloadResource as downloadResourceAction,
   editResource as editResourceAction,
@@ -16,30 +16,21 @@ import {
   assignTagsToResource as assignTagsAction,
   removeTagFromResource as removeTagAction,
 } from '../lib/features/tags/tagSlice';
-import { logout as logoutAction, fetchCurrentUser } from '../lib/features/auth/authSlice';
+import { logout as logoutAction } from '../lib/features/auth/authSlice';
 
 export const useResources = () => {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const { items: resources, loading, error } = useAppSelector((state) => state.resources);
   const { items: allTags } = useAppSelector((state) => state.tags);
-  
+
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    // Check auth via localStorage directly here or rely on auth state if initialized
-    // For now, let's keep the simple token check to redirect if missing
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    // Fetch current user and resources
-    dispatch(fetchCurrentUser());
     dispatch(fetchResourcesAction());
     dispatch(fetchTagsAction());
-  }, [dispatch, router]);
+  }, [dispatch]);
 
   const fetchResources = (params?: { q?: string; tags?: string }) => {
     dispatch(fetchResourcesAction(params));

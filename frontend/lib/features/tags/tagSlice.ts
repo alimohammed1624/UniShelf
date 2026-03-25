@@ -1,5 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { AxiosError } from 'axios';
 import { Tag, TagBrief } from '@/types';
+import api from '@/lib/api';
+import { extractErrorMessage } from '@/lib/apiUtils';
 
 interface TagState {
   items: Tag[];
@@ -13,29 +16,15 @@ const initialState: TagState = {
   error: null,
 };
 
-function extractErrorMessage(detail: unknown, fallback: string): string {
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
-    return detail[0].msg;
-  }
-  return fallback;
-}
-
 export const fetchTags = createAsyncThunk<Tag[], void, { rejectValue: string }>(
   'tags/fetchAll',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/tags`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to fetch tags'));
-      }
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.get<Tag[]>('/tags');
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch tags'));
     }
   }
 );
@@ -44,22 +33,11 @@ export const createTag = createAsyncThunk<Tag, { name: string }, { rejectValue: 
   'tags/create',
   async ({ name }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/tags`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to create tag'));
-      }
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.post<Tag>('/tags', { name });
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to create tag'));
     }
   }
 );
@@ -72,23 +50,11 @@ export const assignTagsToResource = createAsyncThunk<
   'tags/assignToResource',
   async ({ resourceId, tagIds }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${resourceId}/tags`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(tagIds),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to assign tags'));
-      }
-      const tags: TagBrief[] = await response.json();
-      return { resourceId, tags };
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.post<TagBrief[]>(`/resources/${resourceId}/tags`, tagIds);
+      return { resourceId, tags: response.data };
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to assign tags'));
     }
   }
 );
@@ -101,18 +67,11 @@ export const removeTagFromResource = createAsyncThunk<
   'tags/removeFromResource',
   async ({ resourceId, tagId }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${resourceId}/tags/${tagId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to remove tag'));
-      }
+      await api.delete(`/resources/${resourceId}/tags/${tagId}`);
       return { resourceId, tagId };
-    } catch {
-      return rejectWithValue('Network error');
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to remove tag'));
     }
   }
 );
