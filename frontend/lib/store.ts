@@ -1,11 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './features/auth/authSlice'
 import resourceReducer from './features/resources/resourceSlice'
-import bookmarksReducer from './features/bookmarks/bookmarksSlice'
+import bookmarksReducer, { saveToStorage } from './features/bookmarks/bookmarksSlice'
 import tagReducer from './features/tags/tagSlice'
 
 export const makeStore = () => {
-  return configureStore({
+  const store = configureStore({
     reducer: {
       auth: authReducer,
       resources: resourceReducer,
@@ -13,6 +13,17 @@ export const makeStore = () => {
       tags: tagReducer,
     },
   })
+
+  let previousBookmarkIds = store.getState().bookmarks.ids;
+  store.subscribe(() => {
+    const currentIds = store.getState().bookmarks.ids;
+    if (currentIds !== previousBookmarkIds) {
+      saveToStorage(currentIds);
+      previousBookmarkIds = currentIds;
+    }
+  });
+
+  return store;
 }
 
 // Infer the type of makeStore

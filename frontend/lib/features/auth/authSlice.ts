@@ -128,7 +128,9 @@ const authSlice = createSlice({
         state.user = null;
         state.isAuthenticated = false;
         state.token = null;
-        localStorage.removeItem('token');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+        }
       });
   },
 });
