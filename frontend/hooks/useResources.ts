@@ -207,5 +207,6 @@ export const useResources = () => {
     assignTags,
     removeTag,
     removeFile,
+    logout,
   };
 };
