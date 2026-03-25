@@ -43,16 +43,57 @@ export default function SearchPage() {
     const uniqueIds = [
       ...new Set(resources.filter((r) => !r.is_anonymous).map((r) => r.uploader_id)),
     ];
-    if (uniqueIds.length === 0) return;
-    Promise.all(
-      uniqueIds.map((id) =>
-        api.get<UserPublicProfile>(`/users/${id}`)
-          .then((r) => r.data)
-          .catch(() => null)
-      )
-    ).then((profiles) => setUploaders(profiles.filter(Boolean) as UserPublicProfile[]));
-  }, [resources]);
 
+    // If there are no non-anonymous resources, clear uploaders and exit early.
+    if (uniqueIds.length === 0) {
+      if (uploaders.length !== 0) {
+        setUploaders([]);
+      }
+      return;
+    }
+
+    // Build a cache index from already-fetched uploader profiles.
+    const existingIds = new Set(uploaders.map((u) => (u as any).id ?? (u as any).uploader_id));
+    const missingIds = uniqueIds.filter((id) => !existingIds.has(id));
+
+    // All required profiles are already cached; no need to refetch.
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    Promise.all(
+      missingIds.map((id) =>
+        api
+          .get<UserPublicProfile>(`/users/${id}`)
+          .then((r) => r.data)
+          .catch(() => null),
+      ),
+    ).then((profiles) => {
+      const newProfiles = profiles.filter(Boolean) as UserPublicProfile[];
+      if (newProfiles.length === 0) return;
+
+      // Merge newly fetched profiles into the existing cache, deduplicating by id.
+      setUploaders((prev) => {
+        const byId = new Map<string | number, UserPublicProfile>();
+
+        for (const p of prev) {
+          const key = (p as any).id ?? (p as any).uploader_id;
+          if (key != null && !byId.has(key)) {
+            byId.set(key, p);
+          }
+        }
+
+        for (const p of newProfiles) {
+          const key = (p as any).id ?? (p as any).uploader_id;
+          if (key != null && !byId.has(key)) {
+            byId.set(key, p);
+          }
+        }
+
+        return Array.from(byId.values());
+      });
+    });
+  }, [resources, uploaders]);
   const addTagChip = () => {
     const val = tagInput.trim();
     if (val && !tagChips.includes(val)) setTagChips((prev) => [...prev, val]);
