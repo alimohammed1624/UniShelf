@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { ResourceUploadCard } from '@/components/dashboard/resource-upload-card';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import {
+  fetchResources,
   uploadResource,
   downloadResource,
   editResource,
@@ -12,6 +13,7 @@ import {
   changeResourceFile,
 } from '@/lib/features/resources/resourceSlice';
 import {
+  fetchTags,
   createTag,
   assignTagsToResource,
   removeTagFromResource,
@@ -28,6 +30,11 @@ export default function MyResourcesPage() {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (resources.length === 0) dispatch(fetchResources());
+    if (allTags.length === 0) dispatch(fetchTags());
+  }, [dispatch, resources.length, allTags.length]);
 
   const myResources = resources.filter((r) => r.owner_id === user?.id);
 

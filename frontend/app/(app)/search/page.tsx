@@ -251,6 +251,7 @@ export default function SearchPage() {
               {chip}
               <button
                 type="button"
+                aria-label={`Remove uploader ${chip}`}
                 onClick={() => setUserChips((prev) => prev.filter((c) => c !== chip))}
                 className="rounded-full hover:bg-muted"
               >

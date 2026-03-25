@@ -4,7 +4,7 @@ interface BookmarksState {
   ids: number[];
 }
 
-function loadFromStorage(): number[] {
+export function loadFromStorage(): number[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem('bookmarks');
@@ -14,7 +14,7 @@ function loadFromStorage(): number[] {
   }
 }
 
-function saveToStorage(ids: number[]) {
+export function saveToStorage(ids: number[]) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('bookmarks', JSON.stringify(ids));
   }
@@ -31,11 +31,9 @@ const bookmarksSlice = createSlice({
       } else {
         state.ids.push(id);
       }
-      saveToStorage(state.ids);
     },
     clearBookmarks: (state) => {
       state.ids = [];
-      saveToStorage([]);
     },
   },
 });
