@@ -1,5 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { AxiosError } from 'axios';
 import { Resource } from '@/types';
+import api from '@/lib/api';
+import { extractErrorMessage } from '@/lib/apiUtils';
 
 interface ResourceState {
   items: Resource[];
@@ -13,35 +16,16 @@ const initialState: ResourceState = {
   error: null,
 };
 
-// Helper to extract error message from FastAPI/Pydantic responses
-function extractErrorMessage(detail: unknown, fallback: string): string {
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
-    return detail[0].msg;
-  }
-  return fallback;
-}
-
 // Async Thunks
 export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: string }>(
   'resources/fetchAll',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Failed to fetch resources'));
-      }
-
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.get<Resource[]>('/resources');
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch resources'));
     }
   }
 );
@@ -50,23 +34,11 @@ export const uploadResource = createAsyncThunk<Resource, FormData, { rejectValue
   'resources/upload',
   async (formData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Upload failed'));
-      }
-
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.post<Resource>('/resources', formData);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Upload failed'));
     }
   }
 );
@@ -75,19 +47,8 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
   'resources/download',
   async ({ id, title }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        return rejectWithValue('Download failed');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const response = await api.get(`/resources/${id}/download`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
       a.download = title || `resource-${id}`;
@@ -95,8 +56,9 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch {
-      return rejectWithValue('Network error');
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Download failed'));
     }
   }
 );
@@ -105,24 +67,11 @@ export const editResource = createAsyncThunk<Resource, { id: number; title: stri
   'resources/edit',
   async ({ id, title, description, is_public }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title, description, is_public }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Edit failed'));
-      }
-
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.put<Resource>(`/resources/${id}`, { title, description, is_public });
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Edit failed'));
     }
   }
 );
@@ -131,22 +80,11 @@ export const deleteResource = createAsyncThunk<number, number, { rejectValue: st
   'resources/delete',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'Delete failed'));
-      }
-
+      await api.delete(`/resources/${id}`);
       return id;
-    } catch {
-      return rejectWithValue('Network error');
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Delete failed'));
     }
   }
 );
@@ -155,27 +93,14 @@ export const changeResourceFile = createAsyncThunk<Resource, { id: number; formD
   'resources/changeFile',
   async ({ id, formData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/resources/${id}/file`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(extractErrorMessage(errorData.detail, 'File change failed'));
-      }
-
-      return await response.json();
-    } catch {
-      return rejectWithValue('Network error');
+      const response = await api.patch<Resource>(`/resources/${id}/file`, formData);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'File change failed'));
     }
   }
 );
-
 
 const resourceSlice = createSlice({
   name: 'resources',
@@ -207,7 +132,7 @@ const resourceSlice = createSlice({
       })
       .addCase(uploadResource.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.push(action.payload); // Optimistic update or just append result
+        state.items.push(action.payload);
       })
       .addCase(uploadResource.rejected, (state, action) => {
         state.loading = false;

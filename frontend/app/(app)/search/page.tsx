@@ -15,6 +15,7 @@ import {
 } from '@/lib/features/resources/resourceSlice';
 import { toast } from 'sonner';
 import { UserPublicProfile } from '@/types';
+import api from '@/lib/api';
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
@@ -37,14 +38,13 @@ export default function SearchPage() {
       ...new Set(resources.filter((r) => !r.is_anonymous).map((r) => r.uploader_id)),
     ];
     if (uniqueIds.length === 0) return;
-    const token = localStorage.getItem('token');
     Promise.all(
       uniqueIds.map((id) =>
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/users/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : null))
+        api.get<UserPublicProfile>(`/users/${id}`)
+          .then((r) => r.data)
+          .catch(() => null)
       )
-    ).then((profiles) => setUploaders(profiles.filter(Boolean)));
+    ).then((profiles) => setUploaders(profiles.filter(Boolean) as UserPublicProfile[]));
   }, [resources]);
 
   const addTagChip = () => {
