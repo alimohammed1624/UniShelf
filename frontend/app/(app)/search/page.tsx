@@ -14,6 +14,7 @@ import {
   changeResourceFile,
 } from '@/lib/features/resources/resourceSlice';
 import {
+  fetchTags,
   createTag,
   assignTagsToResource,
   removeTagFromResource,
@@ -38,6 +39,10 @@ export default function SearchPage() {
   useEffect(() => {
     if (resources.length === 0) dispatch(fetchResources());
   }, [dispatch, resources.length]);
+
+  useEffect(() => {
+    if (allTags.length === 0) dispatch(fetchTags());
+  }, [dispatch, allTags.length]);
 
   useEffect(() => {
     const uniqueIds = [
