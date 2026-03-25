@@ -13,6 +13,11 @@ import {
   deleteResource,
   changeResourceFile,
 } from '@/lib/features/resources/resourceSlice';
+import {
+  createTag,
+  assignTagsToResource,
+  removeTagFromResource,
+} from '@/lib/features/tags/tagSlice';
 import { toast } from 'sonner';
 import { UserPublicProfile } from '@/types';
 import api from '@/lib/api';
@@ -28,6 +33,7 @@ export default function SearchPage() {
   const dispatch = useAppDispatch();
   const { items: resources, loading } = useAppSelector((state) => state.resources);
   const { user } = useAppSelector((state) => state.auth);
+  const { items: allTags } = useAppSelector((state) => state.tags);
 
   useEffect(() => {
     if (resources.length === 0) dispatch(fetchResources());
@@ -131,6 +137,27 @@ export default function SearchPage() {
     } catch { return false; }
   };
 
+  const handleCreateTag = async (name: string) => {
+    try { return await dispatch(createTag({ name })).unwrap(); }
+    catch { toast.error('Failed to create tag'); return null; }
+  };
+
+  const handleAssignTags = async (resourceId: number, tagIds: number[]) => {
+    try {
+      const promise = dispatch(assignTagsToResource({ resourceId, tagIds })).unwrap();
+      toast.promise(promise, { loading: 'Saving tags...', success: 'Tags updated', error: 'Failed to assign tags' });
+      await promise; return true;
+    } catch { return false; }
+  };
+
+  const handleRemoveTag = async (resourceId: number, tagId: number) => {
+    try {
+      const promise = dispatch(removeTagFromResource({ resourceId, tagId })).unwrap();
+      toast.promise(promise, { loading: 'Removing tag...', success: 'Tag removed', error: 'Failed to remove tag' });
+      await promise; return true;
+    } catch { return false; }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Search</h1>
@@ -200,10 +227,14 @@ export default function SearchPage() {
         loading={loading}
         currentUserId={user?.id ?? null}
         currentUserRole={user?.role ?? 0}
+        allTags={allTags}
         onDownload={handleDownload}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onChangeFile={handleChangeFile}
+        onCreateTag={handleCreateTag}
+        onAssignTags={handleAssignTags}
+        onRemoveTag={handleRemoveTag}
       />
     </div>
   );

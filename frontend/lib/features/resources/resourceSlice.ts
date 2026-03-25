@@ -3,6 +3,7 @@ import type { AxiosError } from 'axios';
 import { Resource } from '@/types';
 import api from '@/lib/api';
 import { extractErrorMessage } from '@/lib/apiUtils';
+import { assignTagsToResource, removeTagFromResource } from '../tags/tagSlice';
 
 interface ResourceState {
   items: Resource[];
@@ -17,11 +18,20 @@ const initialState: ResourceState = {
 };
 
 // Async Thunks
-export const fetchResources = createAsyncThunk<Resource[], void, { rejectValue: string }>(
+export interface SearchParams {
+  q?: string;
+  tags?: string;
+}
+
+export const fetchResources = createAsyncThunk<Resource[], SearchParams | void, { rejectValue: string }>(
   'resources/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const response = await api.get<Resource[]>('/resources');
+      const searchParams = new URLSearchParams();
+      if (params?.q) searchParams.set('q', params.q);
+      if (params?.tags) searchParams.set('tags', params.tags);
+      const qs = searchParams.toString();
+      const response = await api.get<Resource[]>(`/resources${qs ? `?${qs}` : ''}`);
       return response.data;
     } catch (err) {
       const error = err as AxiosError<{ detail: unknown }>;
@@ -160,6 +170,17 @@ const resourceSlice = createSlice({
       })
       .addCase(changeResourceFile.rejected, (state, action) => {
         state.error = action.payload || 'File change failed';
+      })
+      // Tag assignment (update resource tags in-place)
+      .addCase(assignTagsToResource.fulfilled, (state, action) => {
+        const idx = state.items.findIndex((r) => r.id === action.payload.resourceId);
+        if (idx !== -1) state.items[idx].tags = action.payload.tags;
+      })
+      .addCase(removeTagFromResource.fulfilled, (state, action) => {
+        const idx = state.items.findIndex((r) => r.id === action.payload.resourceId);
+        if (idx !== -1) {
+          state.items[idx].tags = state.items[idx].tags.filter((t) => t.id !== action.payload.tagId);
+        }
       });
   },
 });

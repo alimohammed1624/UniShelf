@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './features/auth/authSlice'
 import resourceReducer from './features/resources/resourceSlice'
 import bookmarksReducer from './features/bookmarks/bookmarksSlice'
+import tagReducer from './features/tags/tagSlice'
 
 export const makeStore = () => {
   return configureStore({
@@ -9,6 +10,7 @@ export const makeStore = () => {
       auth: authReducer,
       resources: resourceReducer,
       bookmarks: bookmarksReducer,
+      tags: tagReducer,
     },
   })
 }
