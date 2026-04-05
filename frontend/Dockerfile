@@ -2,7 +2,7 @@
 FROM oven/bun:latest AS deps
 WORKDIR /app
 COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # ── Stage 2: Build the Next.js app ──
 FROM oven/bun:latest AS builder
