@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -176,7 +177,11 @@ export function ResourceTableCard({
               <TableBody>
                 {resources.map((resource) => (
                   <TableRow key={resource.id}>
-                    <TableCell className="font-medium">{resource.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
+                        {resource.title}
+                      </Link>
+                    </TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-xs">{resource.filename ?? '—'}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
