@@ -1,183 +1,87 @@
 # UniShelf
 
-UniShelf is a centralized academic resource sharing platform designed for university ecosystems. It enables students to upload, organize, discover, and access educational materials such as PDFs, images, and other resources in a structured manner.
+A centralized academic resource sharing platform for university ecosystems. Students can upload, organize, discover, and access educational materials in a structured manner.
 
 ## Tech Stack
 
-*   **Frontend:** Next.js 15+ (React), TypeScript, Tailwind CSS
-*   **Backend:** FastAPI (Python), SQLAlchemy
-*   **Database:** PostgreSQL
-*   **Storage:** MinIO (S3-compatible object storage)
-*   **Proxy:** Nginx (Reverse proxy, caching, compression)
-*   **Authentication:** JWT (JSON Web Tokens)
-*   **Infrastructure:** Docker, Docker Compose
-*   **Package Managers:** Bun (Frontend), uv (Backend)
-*   **Monitoring:** Prometheus + Grafana
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15+ (App Router), TypeScript, Tailwind CSS |
+| Backend | FastAPI, SQLAlchemy |
+| Database | PostgreSQL |
+| Object Storage | MinIO (S3-compatible) |
+| Auth | JWT (OAuth2 Password Flow) |
+| Infra | Docker Compose, Nginx |
+| Monitoring | Prometheus + Grafana |
 
-## Prerequisites
+## Quick Start
 
-*   **Docker & Docker Compose** (Recommended for the full stack experience)
-*   **Bun** (v1.0+) (for local frontend development)
-*   **uv** (for local backend development)
+```bash
+git clone https://github.com/alimohammed1624/UniShelf.git && cd UniShelf
+cp env.example .env
+docker compose up --build
+```
 
-## Getting Started
+The app is available at **http://localhost:8000**.
 
-### Option 1: Using Docker (Recommended)
+| Service | URL |
+|---------|-----|
+| Web App (via Nginx) | http://localhost:8000 |
+| Backend API docs (Swagger) | http://localhost:8000/docs |
+| MinIO Console | http://localhost:9001 |
+| Grafana Dashboards | http://localhost:8000/grafana |
+| Prometheus Metrics | http://localhost:8000/metrics |
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/alimohammed1624/UniShelf.git
-    cd UniShelf
-    ```
+> Registration requires a `.edu` email address. Run `uv run seed_db.py` inside the backend container to populate sample data.
 
-2.  **Create environment file:**
-    ```bash
-    cp env.example .env
-    ```
-    Review and customize the `.env` file if needed (database credentials, MinIO settings, etc.)
+## Local Development
 
-3.  **Run with Docker Compose:**
-    ```bash
-    docker compose up --build
-    ```
+### Backend (requires **uv**)
+```bash
+cd backend && uv sync && cp ../env.example .env
+uv run fastapi dev app/main.py   # → http://localhost:8000
+```
 
-    This will start the entire stack:
-    *   **Web App (Nginx):** http://localhost:8000
-    *   **Frontend (Next.js):** http://localhost:3000 (Direct access)
-    *   **Backend API:** http://localhost:8000/api
-    *   **MinIO Console:** http://localhost:9001
-    *   **Grafana Dashboards:** http://localhost:8000/grafana (Admin password from `.env` or default `admin`)
-    *   **Prometheus Metrics:** http://localhost:8000/metrics
-
-### Option 2: Local Development
-
-#### Backend
-
-1.  Navigate to the `backend` directory:
-    ```bash
-    cd backend
-    ```
-
-2.  Install dependencies using `uv` (creates virtual environment automatically):
-    ```bash
-    uv sync
-    ```
-
-3.  Copy `env.example` and configure your environment variables:
-    ```bash
-    cp ../env.example .env
-    ```
-
-4.  Run the development server:
-    ```bash
-    uv run fastapi dev app/main.py
-    ```
-    The API will be available at http://localhost:8000.
-
-#### Frontend
-
-1.  Navigate to the `frontend` directory:
-    ```bash
-    cd frontend
-    ```
-
-2.  Install dependencies using `bun`:
-    ```bash
-    bun install
-    ```
-
-3.  Run the development server (configured with Turbopack for speed):
-    ```bash
-    bun run dev
-    ```
-    The app will be available at http://localhost:3000.
-
-## Usage
-
-1.  **Register/Login:**
-    *   Access the app at http://localhost:8000.
-    *   Create an account with a valid university email address (.edu domain).
-    *   Log in with your credentials.
-
-2.  **Dashboard:**
-    *   **Upload Resources:** Use the "Upload Resource" form.
-        *   Click **"Choose File"** to select a document (PDF, images, etc.).
-        *   Enter a title and description.
-        *   Assign existing tags or create new ones.
-        *   Click **"Upload"** to save.
-    *   **Download Resources:** Browse the list of available resources and click **"Download"** to retrieve files.
-    *   **Edit/Delete Resources:** Modify metadata or remove your uploaded resources.
-    *   **Manage Tags:** Assign tags to resources, create new tags, and remove existing tag assignments.
-
-3.  **User Profile:**
-    *   View your profile at `/api/users/me`
-    *   Update your full name or change your password
-    *   Manage interest tags for personalized resource recommendations
+### Frontend (requires **Bun**)
+```bash
+cd frontend && bun install
+bun run dev                       # → http://localhost:3000
+```
 
 ## Features
 
-### For Students & Faculty
-*   Upload and share educational resources (PDFs, images, documents)
-*   Organize resources with hierarchical folder-like structure
-*   Tag resources with custom categories for easy discovery
-*   Set resources as public or private
-*   Enable anonymous uploads when needed
-*   Track resource access history
-
-### For Admins & Moderators
-*   **User Management:** Ban/unban users, change user roles
-*   **Resource Oversight:** View all resources including archived ones
-*   **Tag Management:** Create and manage system-wide tags
-*   **Visibility Control:** Whitelist/blacklist specific users for resource access
-
-### Infrastructure Features
-*   Persistent storage using PostgreSQL and MinIO
-*   Docker-based orchestration with health checks
-*   Prometheus metrics for monitoring API performance
-*   Grafana dashboards for visualizing platform usage
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `POSTGRES_USER` | Database username |
-| `POSTGRES_PASSWORD` | Database password |
-| `POSTGRES_DB` | Database name |
-| `POSTGRES_PORT` | Database port (default: 5432) |
-| `MINIO_ROOT_USER` | MinIO access key |
-| `MINIO_ROOT_PASSWORD` | MinIO secret key |
-| `MINIO_BUCKET_NAME` | MinIO bucket for uploads |
-| `MINIO_CONSOLE_URL` | MinIO console URL for browser access |
-| `NEXT_PUBLIC_API_URL` | Backend API endpoint (frontend) |
-| `DEBUG` | Enable debug mode |
-| `APP_PORT` | Application port |
-| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password |
+- Upload and share PDFs, images, and documents via MinIO object storage
+- Organize resources with hierarchical parent-child relationships
+- Tag resources for easy discovery; manage system-wide tags
+- Public/private resource visibility with per-user access control (whitelist/blacklist)
+- Anonymous uploads support
+- User management: role changes, ban/unban (admin)
+- Prometheus metrics and Grafana dashboards for monitoring
 
 ## Project Structure
 
-*   `backend/`: FastAPI application code managed with `uv`.
-    *   `app/controllers/`: API endpoints (auth, users, resources, tags, admin)
-    *   `app/models/`: SQLAlchemy models and database tables
-    *   `app/utils/`: Utility functions (MinIO client, metrics)
-*   `frontend/`: Next.js application code managed with `bun`.
-    *   `app/`: App router pages (Login, Signup, Dashboard)
-    *   `components/`: Reusable UI components
-    *   `hooks/`: Custom React hooks (resource management)
-*   `nginx/`: Nginx configuration for reverse proxying and caching
-*   `prometheus/`: Prometheus metrics configuration
-*   `grafana/`: Grafana dashboard provisioning
-*   `data/`: Persistent data for databases (gitignored)
-*   `compose.yaml`: Docker orchestration configuration
+```
+backend/          FastAPI app — controllers/, models/, utils/
+frontend/         Next.js 15+ App Router — app/(app)/, components/, hooks/
+nginx/            Reverse proxy & caching config
+prometheus/       Metrics collection config
+grafana/          Dashboard provisioning
+data/             Persistent volumes (gitignored)
+compose.yaml      Docker orchestration
+```
 
-## API Documentation
+## Environment Variables
 
-Once the backend server is running, visit:
-*   Swagger UI: http://localhost:8000/docs
+See `env.example` for all options. Key variables:
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGRES_USER` | `unishelf` | Database username |
+| `POSTGRES_PASSWORD` | `unishelf_password` | Database password |
+| `MINIO_ROOT_USER` | `minioadmin` | MinIO access key |
+| `MINIO_ROOT_PASSWORD` | `minioadmin123` | MinIO secret key |
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | Grafana admin password |
 
 ## Authors
 
-*   Tiya Ananta
-*   Prachi Raghunath Tandel
-*   Mohammed Sadiq Ali
-*   Varun Tangtur
+Tiya Ananta · Prachi Raghunath Tandel · Mohammed Sadiq Ali · Varun Tangtur
