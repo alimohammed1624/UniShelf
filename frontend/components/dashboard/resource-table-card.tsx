@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { List, Grid3x3, File } from 'lucide-react';
+import api from '@/lib/api';
 
 interface ResourceTableCardProps {
   resources: Resource[];
@@ -74,6 +76,41 @@ export function ResourceTableCard({
   // Tags modal state
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  // Thumbnail state
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+
+  // Fetch thumbnails for grid view
+  useEffect(() => {
+    if (viewMode !== 'grid') return;
+
+    const fetchThumbnails = async () => {
+      const newThumbnails: Record<number, string> = {};
+      for (const resource of resources) {
+        if (resource.type?.startsWith('image/')) {
+          try {
+            const response = await api.get(`/resources/${resource.id}/download`, { responseType: 'blob' });
+            const url = URL.createObjectURL(response.data);
+            newThumbnails[resource.id] = url;
+          } catch (error) {
+            console.warn(`Failed to fetch thumbnail for resource ${resource.id}:`, error);
+          }
+        }
+      }
+      setThumbnails(newThumbnails);
+    };
+
+    fetchThumbnails();
+
+    // Cleanup function to revoke object URLs
+    return () => {
+      Object.values(thumbnails).forEach(url => URL.revokeObjectURL(url));
+      setThumbnails({});
+    };
+  }, [viewMode, resources]);
 
   const openEditModal = (resource: Resource) => {
     setEditingResource(resource);
@@ -152,15 +189,37 @@ export function ResourceTableCard({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Available Resources</CardTitle>
-          <CardDescription>
-            {loading ? 'Loading resources...' : `${resources.length} resources available`}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Available Resources</CardTitle>
+              <CardDescription>
+                {loading ? 'Loading resources...' : `${resources.length} resources available`}
+              </CardDescription>
+            </div>
+            <div className="flex gap-1">
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                aria-label="List view"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {resources.length === 0 ? (
             <p className="text-sm text-muted-foreground">No resources found.</p>
-          ) : (
+          ) : viewMode === 'list' ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -215,6 +274,52 @@ export function ResourceTableCard({
                 ))}
               </TableBody>
             </Table>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {resources.map((resource) => (
+                <div key={resource.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-3">
+                    {thumbnails[resource.id] ? (
+                      <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover rounded-md" />
+                    ) : (
+                      <File className="h-8 w-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <h3 className="font-medium text-sm mb-1 truncate">{resource.title}</h3>
+                  <p className="text-xs text-muted-foreground mb-2 truncate">{resource.filename ?? 'No filename'}</p>
+                  <p className="text-xs mb-2 truncate">{resource.description || 'No description'}</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {resource.tags.map((tag) => (
+                      <Badge key={tag.id} variant="secondary" className="text-xs">{tag.name}</Badge>
+                    ))}
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+                      Download
+                    </Button>
+                    {isOwnerOrAdmin(resource) && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+                          Change
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+                          Tags
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+                          Delete
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
