@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { List, Grid3x3, File } from 'lucide-react';
+import { List, Grid3x3, File as FileIcon } from 'lucide-react';
 import api from '@/lib/api';
 
 interface ResourceTableCardProps {
@@ -38,7 +38,7 @@ interface ResourceTableCardProps {
   onDownload: (id: number, title: string) => void;
   onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
-  onChangeFile: (id: number, file: File) => Promise<boolean>;
+  onChangeFile: (id: number, file: globalThis.File) => Promise<boolean>;
   onCreateTag: (name: string) => Promise<Tag | null>;
   onAssignTags: (resourceId: number, tagIds: number[]) => Promise<boolean>;
   onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
@@ -71,7 +71,7 @@ export function ResourceTableCard({
 
   // Change file modal state
   const [changingResource, setChangingResource] = useState<Resource | null>(null);
-  const [changeFile, setChangeFile] = useState<File | null>(null);
+  const [changeFile, setChangeFile] = useState<globalThis.File | null>(null);
 
   // Tags modal state
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
@@ -107,7 +107,7 @@ export function ResourceTableCard({
 
     // Cleanup function to revoke object URLs
     return () => {
-      Object.values(thumbnails).forEach(url => URL.revokeObjectURL(url));
+      Object.values(thumbnails).forEach((url: string) => URL.revokeObjectURL(url));
       setThumbnails({});
     };
   }, [viewMode, resources]);
@@ -119,7 +119,7 @@ export function ResourceTableCard({
     setEditVisibility(resource.is_public ? 'public' : 'private');
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingResource) return;
     const success = await onEdit(editingResource.id, editTitle, editDescription, editVisibility);
@@ -132,7 +132,7 @@ export function ResourceTableCard({
     setDeleteId(null);
   };
 
-  const handleChangeSubmit = async (e: React.FormEvent) => {
+  const handleChangeSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!changingResource || !changeFile) return;
     const success = await onChangeFile(changingResource.id, changeFile);
@@ -146,7 +146,7 @@ export function ResourceTableCard({
     if (!taggingResource || !newTagName.trim()) return;
     const tag = await onCreateTag(newTagName.trim());
     if (tag) {
-      const currentIds = taggingResource.tags.map((t) => t.id);
+      const currentIds = taggingResource.tags.map((t: { id: number }) => t.id);
       const success = await onAssignTags(taggingResource.id, [...currentIds, tag.id]);
       if (success) {
         // Update local reference so the modal reflects the change
@@ -159,7 +159,7 @@ export function ResourceTableCard({
 
   const handleAssignExistingTag = async (tagId: number) => {
     if (!taggingResource) return;
-    const currentIds = taggingResource.tags.map((t) => t.id);
+    const currentIds = taggingResource.tags.map((t: { id: number }) => t.id);
     if (currentIds.includes(tagId)) return; // already assigned
     const success = await onAssignTags(taggingResource.id, [...currentIds, tagId]);
     if (success) {
@@ -182,7 +182,7 @@ export function ResourceTableCard({
     ? resources.find((r) => r.id === taggingResource.id) ?? taggingResource
     : null;
   const availableTags = activeTaggingResource
-    ? allTags.filter((t) => !activeTaggingResource.tags.some((rt) => rt.id === t.id))
+    ? allTags.filter((t) => !activeTaggingResource.tags.some((rt: { id: number }) => rt.id === t.id))
     : [];
 
   return (
@@ -282,7 +282,7 @@ export function ResourceTableCard({
                     {thumbnails[resource.id] ? (
                       <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover rounded-md" />
                     ) : (
-                      <File className="h-8 w-8 text-muted-foreground" />
+                      <FileIcon className="h-8 w-8 text-muted-foreground" />
                     )}
                   </div>
                   <h3 className="font-medium text-sm mb-1 truncate">{resource.title}</h3>
@@ -325,7 +325,7 @@ export function ResourceTableCard({
       </Card>
 
       {/* ── Edit Resource Modal ── */}
-      <AlertDialog open={!!editingResource} onOpenChange={(open) => { if (!open) setEditingResource(null); }}>
+      <AlertDialog open={!!editingResource} onOpenChange={(open: boolean) => { if (!open) setEditingResource(null); }}>
         <AlertDialogContent>
           <form onSubmit={handleEditSubmit}>
             <AlertDialogHeader>
@@ -373,7 +373,7 @@ export function ResourceTableCard({
       </AlertDialog>
 
       {/* ── Delete Confirmation ── */}
-      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <AlertDialog open={deleteId !== null} onOpenChange={(open: boolean) => { if (!open) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
@@ -389,7 +389,7 @@ export function ResourceTableCard({
       </AlertDialog>
 
       {/* ── Change File Modal ── */}
-      <AlertDialog open={!!changingResource} onOpenChange={(open) => { if (!open) { setChangingResource(null); setChangeFile(null); } }}>
+      <AlertDialog open={!!changingResource} onOpenChange={(open: boolean) => { if (!open) { setChangingResource(null); setChangeFile(null); } }}>
         <AlertDialogContent>
           <form onSubmit={handleChangeSubmit}>
             <AlertDialogHeader>
@@ -417,7 +417,7 @@ export function ResourceTableCard({
       </AlertDialog>
 
       {/* ── Tags Modal ── */}
-      <AlertDialog open={!!taggingResource} onOpenChange={(open) => { if (!open) { setTaggingResource(null); setNewTagName(''); } }}>
+      <AlertDialog open={!!taggingResource} onOpenChange={(open: boolean) => { if (!open) { setTaggingResource(null); setNewTagName(''); } }}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Manage Tags</AlertDialogTitle>
