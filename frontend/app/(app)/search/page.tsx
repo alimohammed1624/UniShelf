@@ -19,6 +19,7 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
+import { toggleBookmark } from '@/lib/features/bookmarks/bookmarksSlice';
 import { toast } from 'sonner';
 import { UserPublicProfile } from '@/types';
 import api from '@/lib/api';
@@ -35,6 +36,7 @@ export default function SearchPage() {
   const { items: resources, loading } = useAppSelector((state) => state.resources);
   const { user } = useAppSelector((state) => state.auth);
   const { items: allTags } = useAppSelector((state) => state.tags);
+  const bookmarkedResourceIds = useAppSelector((state) => state.bookmarks.ids);
 
   useEffect(() => {
     if (resources.length === 0) dispatch(fetchResources());
@@ -204,6 +206,16 @@ export default function SearchPage() {
     } catch { return false; }
   };
 
+  const handleToggleBookmark = (resourceId: number, resourceTitle: string) => {
+    const isBookmarked = bookmarkedResourceIds.includes(resourceId);
+    dispatch(toggleBookmark(resourceId));
+    toast.success(
+      isBookmarked
+        ? `Removed "${resourceTitle}" from bookmarks`
+        : `Added "${resourceTitle}" to bookmarks`
+    );
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Search</h1>
@@ -276,6 +288,9 @@ export default function SearchPage() {
         currentUserId={user?.id ?? null}
         currentUserRole={user?.role ?? 0}
         allTags={allTags}
+        showBookmarkAction
+        bookmarkedResourceIds={bookmarkedResourceIds}
+        onToggleBookmark={handleToggleBookmark}
         onDownload={handleDownload}
         onEdit={handleEdit}
         onDelete={handleDelete}
