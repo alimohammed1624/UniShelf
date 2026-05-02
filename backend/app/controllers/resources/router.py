@@ -16,6 +16,7 @@ from app.controllers.auth.helpers import get_current_user, require_role
 from app.utils.minio_client import upload_file, stream_download, delete_file, get_minio_client
 from app.utils.db_helpers import (
     active_resources,
+    check_resource_access,
     get_resource_or_404,
     require_resource_access,
     require_resource_owner,
@@ -566,4 +567,136 @@ def remove_tag_from_resource(
 
     resource.tags.remove(tag)
     db.commit()
+
+
+# ── Tree: children ────────────────────────────────────────────
+
+
+def _build_children_tree(
+    db: Session,
+    parent_id: int,
+    hierarchy_prefix: str,
+    current_depth: int,
+    max_depth: int,
+    user: User,
+) -> List[dict]:
+    """Recursively build a tree of children resources with visibility filtering."""
+    if current_depth > max_depth:
+        return []
+
+    query = (
+        active_resources(db)
+        .options(selectinload(Resource.tags))
+        .filter(
+            Resource.parent_id == parent_id,
+            Resource.hierarchy.like(f"{hierarchy_prefix}.%"),
+        )
+    )
+
+    # Apply visibility filtering for non-admin users
+    blacklisted_ids = (
+        db.query(Visibility.resource_id)
+        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.BLACKLIST))
+        .subquery()
+    )
+    whitelisted_ids = (
+        db.query(Visibility.resource_id)
+        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.WHITELIST))
+        .subquery()
+    )
+
+    if user.role < int(UserRole.ADMIN):
+        query = query.filter(
+            (
+                (Resource.is_public == True) & ~Resource.id.in_(blacklisted_ids)
+            )
+            | (Resource.uploader_id == user.id)
+            | (Resource.owner_id == user.id)
+            | Resource.id.in_(whitelisted_ids)
+        )
+
+    children = query.order_by(Resource.title.asc()).all()
+    result = []
+
+    for child in children:
+        node = {
+            "id": child.id,
+            "title": child.title,
+            "type": child.type,
+            "filename": child.filename,
+            "is_directory": child.type == "directory",
+        }
+        if child.type == "directory" and current_depth < max_depth:
+            node["children"] = _build_children_tree(
+                db, child.id, child.hierarchy, current_depth + 1, max_depth, user
+            )
+        result.append(node)
+
+    return result
+
+
+@router.get("/{resource_id}/tree/children", response_model=List[dict])
+def get_resource_children(
+    resource_id: int,
+    max_depth: int = Query(default=3, ge=1, le=5),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource = get_resource_or_404(db, resource_id)
+    require_resource_access(db, resource, current_user)
+
+    if resource.type != "directory":
+        return []
+
+    children = _build_children_tree(
+        db, resource_id, resource.hierarchy, 1, max_depth, current_user
+    )
+    return children
+
+
+# ── Tree: parents ─────────────────────────────────────────────
+
+
+@router.get("/{resource_id}/tree/parents", response_model=List[dict])
+def get_resource_parents(
+    resource_id: int,
+    max_levels: int = Query(default=2, ge=1, le=10),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource = get_resource_or_404(db, resource_id)
+    require_resource_access(db, resource, current_user)
+
+    parents = []
+    current_parent_id = resource.parent_id
+    depth = 0
+
+    while current_parent_id is not None and depth < max_levels:
+        parent = (
+            active_resources(db)
+            .filter(Resource.id == current_parent_id, Resource.is_archived == False)
+            .first()
+        )
+        if parent is None:
+            break
+
+        # Check visibility for non-admin users
+        visible = check_resource_access(db, parent, current_user)
+        if not visible:
+            break
+
+        parents.append({
+            "id": parent.id,
+            "title": parent.title,
+            "type": parent.type,
+            "filename": parent.filename,
+            "is_directory": parent.type == "directory",
+        })
+
+        current_parent_id = parent.parent_id
+        depth += 1
+
+    # Reverse so root comes first
+    parents.reverse()
+    return parents
 
