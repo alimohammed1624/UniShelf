@@ -32,7 +32,30 @@ The app is available at **http://localhost:8000**.
 | Grafana Dashboards | http://localhost:8000/grafana |
 | Prometheus Metrics | http://localhost:8000/metrics |
 
-> Registration requires a `.edu` email address. Run `uv run seed_db.py` inside the backend container to populate sample data.
+> Registration requires a `.edu` email address.
+
+## Database Seeding
+
+The seed script populates the database with sample users, tags, and resources (including files uploaded to MinIO).
+
+```bash
+# Seed without clearing existing data
+docker compose exec backend python seed_db.py
+
+# Wipe all data first, then seed fresh
+docker compose exec backend python seed_db.py --reset
+```
+
+**Seeded accounts:**
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@unishelf.edu | Admin123! | Admin |
+| mod@unishelf.edu | Mod123! | Moderator |
+| student1@unishelf.edu | Student123! | Student |
+| student2@unishelf.edu | Student123! | Student |
+
+The script creates 4 users, 18 tags across CS/Math/Engineering categories, and ~20 resources organized in a hierarchy (e.g., `cse.sem1`, `cse.sem3`, `math.calculus`) with sample file content uploaded to MinIO.
 
 ## Local Development
 

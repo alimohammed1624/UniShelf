@@ -264,9 +264,11 @@ export function ResourceTableCard({
                     <TableCell>User #{resource.uploader_id}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                          Download
-                        </Button>
+                        {resource.type !== 'directory' && (
+                          <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+                            Download
+                          </Button>
+                        )}
                         {hasBookmarkAction && (
                           <Button
                             size="sm"
@@ -327,9 +329,11 @@ export function ResourceTableCard({
                     {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                      Download
-                    </Button>
+                    {resource.type !== 'directory' && (
+                      <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+                        Download
+                      </Button>
+                    )}
                     {isOwnerOrAdmin(resource) && (
                       <>
                         <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
