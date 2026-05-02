@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bookmark, FolderOpen, User } from 'lucide-react';
+import { Search, Bookmark, FolderOpen, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAppDispatch } from '@/lib/hooks';
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { logout } from '@/lib/features/auth/authSlice';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const userRole = useAppSelector((state) => state.auth.user?.role ?? -1);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -32,6 +33,18 @@ export function Navbar() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <span className="text-lg font-semibold">UniShelf</span>
         <nav className="flex items-center gap-1">
+          {userRole >= 1 && (
+            <Link
+              href="/moderate"
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
+                pathname === '/moderate' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+              )}
+            >
+              <Shield size={15} />
+              Moderate
+            </Link>
+          )}
           {NAV_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}

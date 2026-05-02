@@ -2,15 +2,16 @@ import re
 import logging
 from typing import List, Optional
 from uuid import uuid4
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Body, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func as sa_func
 
-from app.models import Resource, User, Tag, Visibility
-from app.models.enums import UserRole, AccessType
+from app.models import Resource, User, Tag, Visibility, Report
+from app.models.enums import UserRole, AccessType, ReportStatus
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
 from app.utils.minio_client import upload_file, stream_download, delete_file, get_minio_client
@@ -24,8 +25,35 @@ from app.utils.db_helpers import (
     validate_hierarchy,
 )
 from .schemas import ResourceSchema, ResourceUpdate, VisibilityCreate, VisibilitySchema, TagBrief
+from app.controllers.moderate.schemas import ResourceBrief
 from app.config import settings
 from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
+from pydantic import BaseModel
+
+
+class _ReportResponse(BaseModel):
+    id: int
+    reported_by: int
+    resource_id: int
+    reason: str
+    status: int
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    resource: ResourceBrief
+
+    class Config:
+        from_attributes = True
+
+
+class _ResourceBrief(BaseModel):
+    id: int
+    title: str
+    filename: Optional[str] = None
+    uploader_id: int
+    is_archived: bool
+
+    class Config:
+        from_attributes = True
 
 logger = logging.getLogger(__name__)
 
@@ -699,4 +727,64 @@ def get_resource_parents(
     # Reverse so root comes first
     parents.reverse()
     return parents
+
+
+# ── Report resource ───────────────────────────────────────────
+
+@router.post("/{resource_id}/report", response_model=_ReportResponse, status_code=status.HTTP_201_CREATED)
+def report_resource(
+    resource_id: int,
+    reason: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Alias for submitting a report on a specific resource."""
+    # Validate reason (mirrors ReportCreate validator)
+    reason = reason.strip()
+    if not reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Reason cannot be empty"
+        )
+    if len(reason) > 2000:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Reason must be at most 2000 characters"
+        )
+
+    # Check if resource exists and is not already archived
+    resource = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.is_archived == False
+    ).first()
+    if resource is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resource not found or already archived"
+        )
+
+    # Check for duplicate report
+    existing = db.query(Report).filter(
+        Report.reported_by == current_user.id,
+        Report.resource_id == resource_id,
+        Report.status == int(ReportStatus.OPEN)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already reported this resource"
+        )
+
+    new_report = Report(
+        reported_by=current_user.id,
+        resource_id=resource_id,
+        reason=reason,
+        status=int(ReportStatus.OPEN)
+    )
+    db.add(new_report)
+    db.commit()
+    db.refresh(new_report)
+
+    logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {resource_id}")
+    return new_report
 

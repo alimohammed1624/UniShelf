@@ -70,6 +70,32 @@ export interface VisibilityEntry {
   access_type: number; // 0=whitelist, 1=blacklist
 }
 
+// ── Report types ─────────────────────────────────────────────
+
+export interface ResourceBrief {
+  id: number;
+  title: string;
+  filename: string | null;
+  uploader_id: number;
+  is_archived: boolean;
+}
+
+export interface Report {
+  id: number;
+  reported_by: number;
+  resource_id: number;
+  reason: string;
+  status: number; // 0=open, 1=resolved
+  created_at: string;
+  resolved_at: string | null;
+  resource: ResourceBrief;
+}
+
+export interface ReportCreate {
+  resource_id: number;
+  reason: string;
+}
+
 // ── Error types ──────────────────────────────────────────────
 
 export interface ApiError {

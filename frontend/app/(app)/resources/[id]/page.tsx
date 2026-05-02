@@ -35,6 +35,7 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
+import { submitReport } from '@/lib/features/moderate/moderateSlice';
 
 export default function ResourceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -64,6 +65,10 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   // Tags modal state
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
+
+  // Report modal state
+  const [reporting, setReporting] = useState(false);
+  const [reportReason, setReportReason] = useState('');
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
@@ -215,6 +220,18 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     } catch {
       toast.error('Failed to remove tag');
     }
+  };
+
+  // ── Report handler ───────────────────────────────────────
+
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resource || !reportReason.trim()) return;
+    const promise = dispatch(submitReport({ resource_id: resource.id, reason: reportReason })).unwrap();
+    toast.promise(promise, { loading: 'Submitting report...', success: 'Report submitted', error: 'Failed to submit report' });
+    await promise;
+    setReporting(false);
+    setReportReason('');
   };
 
   const activeTaggingResource = taggingResource
@@ -369,6 +386,13 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                 <a href={downloadUrl} download>
                   Download
                 </a>
+              </Button>
+            )}
+
+            {/* Report button - only visible when user is not the owner */}
+            {user && resource.owner_id !== user.id && (
+              <Button variant="outline" className="w-full" onClick={() => setReporting(true)}>
+                Report Resource
               </Button>
             )}
           </CardContent>
@@ -546,6 +570,35 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
           <AlertDialogFooter>
             <AlertDialogCancel>Done</AlertDialogCancel>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Report modal */}
+      <AlertDialog open={reporting} onOpenChange={(open) => { if (!open) { setReporting(false); setReportReason(''); } }}>
+        <AlertDialogContent>
+          <form onSubmit={handleReportSubmit}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Report Resource</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please provide a reason for reporting this resource. It will be reviewed by our moderation team.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="report-reason">Reason</Label>
+              <Textarea
+                id="report-reason"
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                placeholder="Describe why you are reporting this resource..."
+                rows={4}
+                required
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+              <Button type="submit" disabled={!reportReason.trim()}>Submit Report</Button>
+            </AlertDialogFooter>
+          </form>
         </AlertDialogContent>
       </AlertDialog>
     </div>

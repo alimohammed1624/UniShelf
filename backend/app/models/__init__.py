@@ -5,3 +5,4 @@ from .user import User
 from .resource import Resource
 from .tag import Tag
 from .visibility import Visibility
+from .report import Report
