@@ -317,7 +317,11 @@ export function ResourceTableCard({
                       <FileIcon className="h-8 w-8 text-muted-foreground" />
                     )}
                   </div>
-                  <h3 className="font-medium text-sm mb-1 truncate">{resource.title}</h3>
+                  <h3 className="font-medium text-sm mb-1 truncate">
+                    <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
+                      {resource.title}
+                    </Link>
+                  </h3>
                   <p className="text-xs text-muted-foreground mb-2 truncate">{resource.filename ?? 'No filename'}</p>
                   <p className="text-xs mb-2 truncate">{resource.description || 'No description'}</p>
                   <div className="flex flex-wrap gap-1 mb-2">

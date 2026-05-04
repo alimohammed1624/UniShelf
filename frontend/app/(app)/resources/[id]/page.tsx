@@ -64,6 +64,18 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   // Tags modal state
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
+  const [pdfPage, setPdfPage] = useState(1);
+  const [pdfZoom, setPdfZoom] = useState(100);
+  const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
+  const [pdfFullscreen, setPdfFullscreen] = useState(false);
+  const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [imageZoom, setImageZoom] = useState(100);
+  const [imageFullscreen, setImageFullscreen] = useState(false);
+  const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
@@ -116,6 +128,20 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
 
     return () => { cancelled = true; };
   }, [resourceId]);
+
+  useEffect(() => {
+    setPdfPage(1);
+    setPdfZoom(100);
+    setPdfNumPages(null);
+    setPdfFullscreen(false);
+    setPdfPreviewFailed(false);
+    setPdfBlobUrl(null);
+    setImageZoom(100);
+    setImageFullscreen(false);
+    setImageBlobUrl(null);
+    setImageLoading(false);
+    setImagePreviewFailed(false);
+  }, [resource?.id]);
 
   // ── Edit handlers ────────────────────────────────────────
 
@@ -227,12 +253,158 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
 
   // ── Preview helpers ──────────────────────────────────────
 
-  const downloadUrl = resource ? `/api/resources/${resource.id}/download` : '';
+  const apiDownloadPath = resource ? `/resources/${resource.id}/download` : '';
+  const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
+  const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
+  const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
+  const pdfPreviewUrl = pdfBlobUrl ? `${pdfBlobUrl}#toolbar=0&page=${pdfPage}&zoom=${pdfZoom}` : '';
+  const pdfFrameKey = pdfBlobUrl ? `${pdfBlobUrl}-${pdfPage}-${pdfZoom}` : 'pdf-empty';
+  const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
 
   const isPdf = resource?.type === 'application/pdf';
   const isImage = resource?.type?.startsWith('image/');
   const isText = resource?.type?.startsWith('text/');
   const canPreview = isPdf || isImage || isText;
+
+  useEffect(() => {
+    if (!isPdf || !apiInlinePath) {
+      setPdfBlobUrl(null);
+      setPdfLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let localUrl: string | null = null;
+    setPdfLoading(true);
+    setPdfPreviewFailed(false);
+
+    const fetchPdfBlob = async () => {
+      try {
+        const inlineRes = await api.get(apiInlinePath, { responseType: 'blob' });
+        if (cancelled) return;
+        const inlineType = inlineRes.data?.type || '';
+        if (inlineType.includes('pdf') || !inlineType.includes('json')) {
+          localUrl = URL.createObjectURL(inlineRes.data);
+          setPdfBlobUrl(localUrl);
+          return;
+        }
+      } catch {
+        // Try regular download endpoint as fallback.
+      }
+
+      try {
+        const downloadRes = await api.get(apiDownloadPath, { responseType: 'blob' });
+        if (cancelled) return;
+        const downloadType = downloadRes.data?.type || '';
+        if (downloadType.includes('pdf') || !downloadType.includes('json')) {
+          localUrl = URL.createObjectURL(downloadRes.data);
+          setPdfBlobUrl(localUrl);
+          return;
+        }
+      } catch {
+        // Mark failed below.
+      }
+
+      if (!cancelled) {
+        setPdfPreviewFailed(true);
+        setPdfBlobUrl(null);
+      }
+    };
+
+    fetchPdfBlob().finally(() => {
+      if (!cancelled) setPdfLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      if (localUrl) URL.revokeObjectURL(localUrl);
+    };
+  }, [apiDownloadPath, apiInlinePath, isPdf]);
+
+  useEffect(() => {
+    if (!isImage || !apiInlinePath) {
+      setImageBlobUrl(null);
+      setImageLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let localUrl: string | null = null;
+    setImageLoading(true);
+    setImagePreviewFailed(false);
+
+    const fetchImageBlob = async () => {
+      try {
+        const inlineRes = await api.get(apiInlinePath, { responseType: 'blob' });
+        if (cancelled) return;
+        const inlineType = inlineRes.data?.type || '';
+        if (inlineType.startsWith('image/') || !inlineType.includes('json')) {
+          localUrl = URL.createObjectURL(inlineRes.data);
+          setImageBlobUrl(localUrl);
+          return;
+        }
+      } catch {
+        // Try regular download endpoint as fallback.
+      }
+
+      try {
+        const downloadRes = await api.get(apiDownloadPath, { responseType: 'blob' });
+        if (cancelled) return;
+        const downloadType = downloadRes.data?.type || '';
+        if (downloadType.startsWith('image/') || !downloadType.includes('json')) {
+          localUrl = URL.createObjectURL(downloadRes.data);
+          setImageBlobUrl(localUrl);
+          return;
+        }
+      } catch {
+        // Mark failed below.
+      }
+
+      if (!cancelled) {
+        setImagePreviewFailed(true);
+        setImageBlobUrl(null);
+      }
+    };
+
+    fetchImageBlob().finally(() => {
+      if (!cancelled) setImageLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      if (localUrl) URL.revokeObjectURL(localUrl);
+    };
+  }, [apiDownloadPath, apiInlinePath, isImage]);
+
+  useEffect(() => {
+    if (!pdfBlobUrl || !isPdf) {
+      setPdfNumPages(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadPdfMeta = async () => {
+      try {
+        const pdfjs = await import('pdfjs-dist');
+        const { GlobalWorkerOptions, getDocument, version: pdfjsVersion } = pdfjs;
+        GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`;
+        const res = await fetch(pdfBlobUrl);
+        const data = await res.arrayBuffer();
+        const pdf = await getDocument({ data }).promise;
+        if (cancelled) return;
+        setPdfNumPages(pdf.numPages);
+        setPdfPage((prev) => Math.min(prev, pdf.numPages));
+      } catch {
+        if (!cancelled) setPdfNumPages(null);
+      }
+    };
+
+    loadPdfMeta();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPdf, pdfBlobUrl]);
 
   // ── Loading state ────────────────────────────────────────
 
@@ -264,7 +436,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
         ← Back
       </Button>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className={`grid grid-cols-1 gap-6 ${isPreviewFullscreen ? '' : 'lg:grid-cols-[2fr_1fr]'}`}>
         {/* ── Left column: Preview ─────────────────────────── */}
         {canPreview ? (
           <Card>
@@ -273,34 +445,157 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             </CardHeader>
             <CardContent className="p-0">
               {isPdf && (
-                <iframe
-                  src={downloadUrl}
-                  className="w-full h-[60vh] border-0"
-                  title={`Preview of ${resource.title}`}
-                />
+                <div className="space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
+                        disabled={pdfPage <= 1}
+                      >
+                        Prev
+                      </Button>
+                      <span className="min-w-20 text-center text-sm text-muted-foreground">
+                        Page {pdfPage}{pdfNumPages ? ` / ${pdfNumPages}` : ''}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPdfPage((p) => p + 1)}
+                        disabled={!!pdfNumPages && pdfPage >= pdfNumPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+
+                    <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPdfZoom((z) => Math.max(50, z - 10))}
+                        disabled={pdfZoom <= 50}
+                      >
+                        -
+                      </Button>
+                      <span className="min-w-12 text-center text-sm text-muted-foreground">{pdfZoom}%</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPdfZoom((z) => Math.min(300, z + 10))}
+                        disabled={pdfZoom >= 300}
+                      >
+                        +
+                      </Button>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPdfFullscreen((prev) => !prev)}
+                    >
+                      {pdfFullscreen ? 'Exit full screen' : 'Full screen'}
+                    </Button>
+                  </div>
+
+                  {pdfLoading ? (
+                    <div className="p-4 text-sm text-muted-foreground">Loading PDF preview...</div>
+                  ) : !pdfPreviewFailed && pdfBlobUrl ? (
+                    <div className="h-[60vh] w-full overflow-hidden rounded-md border bg-muted/10">
+                      <iframe
+                        key={pdfFrameKey}
+                        src={pdfPreviewUrl}
+                        className="h-full w-full border-0"
+                        title={`Preview of ${resource.title}`}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 rounded-md border bg-muted/40 p-4 text-sm">
+                      <p className="text-muted-foreground">Preview is unavailable in this browser.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button asChild size="sm">
+                          <a href={downloadUrl} download>Download PDF</a>
+                        </Button>
+                        <Button asChild size="sm" variant="outline">
+                          <a href={pdfBlobUrl ?? downloadUrl} target="_blank" rel="noreferrer">Open in new tab</a>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               {isImage && (
-                <div className="flex items-center justify-center p-4">
-                  <img
-                    src={downloadUrl}
-                    alt={resource.title}
-                    className="max-w-full max-h-[60vh] object-contain"
-                  />
+                <div className="space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setImageZoom((z) => Math.max(50, z - 10))}
+                        disabled={imageZoom <= 50}
+                      >
+                        -
+                      </Button>
+                      <span className="min-w-12 text-center text-sm text-muted-foreground">
+                        {imageZoom}%
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setImageZoom((z) => Math.min(300, z + 10))}
+                        disabled={imageZoom >= 300}
+                      >
+                        +
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setImageFullscreen((prev) => !prev)}
+                    >
+                      {imageFullscreen ? 'Exit full screen' : 'Full screen'}
+                    </Button>
+                  </div>
+                  <div className="flex h-[60vh] items-center justify-center overflow-auto rounded-md border bg-muted/10">
+                    {imageLoading ? (
+                      <div className="p-4 text-sm text-muted-foreground">Loading image preview...</div>
+                    ) : imagePreviewFailed || !imageBlobUrl ? (
+                      <div className="p-4 text-sm text-muted-foreground">Preview is unavailable in this browser.</div>
+                    ) : (
+                      <img
+                        src={imageBlobUrl}
+                        alt={resource.title}
+                        className="max-w-full max-h-full object-contain"
+                        style={{ transform: `scale(${imageZoom / 100})`, transformOrigin: 'center' }}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
               {isText && (
-                <TextPreview url={downloadUrl} />
+                <TextPreview url={apiDownloadPath} />
               )}
             </CardContent>
           </Card>
         ) : null}
 
         {/* ── Right column: Metadata ───────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {!isPreviewFullscreen && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold">{resource.title}</h2>
               {resource.description && (
@@ -364,15 +659,16 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Download button */}
-            {resource.type !== 'directory' && (
-              <Button asChild className="w-full" size="lg">
-                <a href={downloadUrl} download>
-                  Download
-                </a>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+              {resource.type !== 'directory' && (
+                <Button asChild className="w-full" size="lg">
+                  <a href={downloadUrl} download>
+                    Download
+                  </a>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* ── Owner actions bar ──────────────────────────────── */}
