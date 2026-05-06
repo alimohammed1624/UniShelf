@@ -195,6 +195,47 @@ export function ResourceTableCard({
   const availableTags = activeTaggingResource
     ? allTags.filter((t) => !activeTaggingResource.tags.some((rt: { id: number }) => rt.id === t.id))
     : [];
+  
+  const renderActions = (resource: Resource) => (
+    <>
+      {resource.type !== 'directory' && (
+        <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+          Download
+        </Button>
+      )}
+      {hasBookmarkAction && (
+        <Button
+          size="sm"
+          variant={bookmarkedSet.has(resource.id) ? 'secondary' : 'outline'}
+          onClick={() => onToggleBookmark(resource.id, resource.title)}
+          aria-label={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
+          title={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
+        >
+          {bookmarkedSet.has(resource.id) ? (
+            <BookmarkCheck className="h-4 w-4" />
+          ) : (
+            <Bookmark className="h-4 w-4" />
+          )}
+        </Button>
+      )}
+      {isOwnerOrAdmin(resource) && (
+        <>
+          <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+            Change
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+            Tags
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+            Delete
+          </Button>
+        </>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -264,42 +305,7 @@ export function ResourceTableCard({
                     <TableCell>User #{resource.uploader_id}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {resource.type !== 'directory' && (
-                          <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                            Download
-                          </Button>
-                        )}
-                        {hasBookmarkAction && (
-                          <Button
-                            size="sm"
-                            variant={bookmarkedSet.has(resource.id) ? 'secondary' : 'outline'}
-                            onClick={() => onToggleBookmark(resource.id, resource.title)}
-                            aria-label={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-                            title={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-                          >
-                            {bookmarkedSet.has(resource.id) ? (
-                              <BookmarkCheck className="h-4 w-4" />
-                            ) : (
-                              <Bookmark className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                        {isOwnerOrAdmin(resource) && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                              Edit
-                            </Button>
-                            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                              Change
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-                              Tags
-                            </Button>
-                            <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                              Delete
-                            </Button>
-                          </>
-                        )}
+                        {renderActions(resource)}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -329,27 +335,7 @@ export function ResourceTableCard({
                     {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {resource.type !== 'directory' && (
-                      <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                        Download
-                      </Button>
-                    )}
-                    {isOwnerOrAdmin(resource) && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                          Change
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-                          Tags
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                          Delete
-                        </Button>
-                      </>
-                    )}
+                    {renderActions(resource)}
                   </div>
                 </div>
               ))}
