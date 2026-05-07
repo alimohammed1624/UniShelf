@@ -9,6 +9,8 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dirtree } from '@/components/dirtree/Dirtree';
+import { useResourceTree } from '@/hooks/useResourceTree';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +66,8 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const [newTagName, setNewTagName] = useState('');
 
   const resourceId = parseInt(resolvedParams.id, 10);
+
+  const { data: treeData, loading: treeLoading } = useResourceTree({ resourceId });
 
   useEffect(() => {
     let cancelled = false;
@@ -360,11 +364,13 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Download button */}
-            <Button asChild className="w-full" size="lg">
-              <a href={downloadUrl} download>
-                Download
-              </a>
-            </Button>
+            {resource.type !== 'directory' && (
+              <Button asChild className="w-full" size="lg">
+                <a href={downloadUrl} download>
+                  Download
+                </a>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -376,6 +382,20 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
           <Button variant="outline" onClick={() => setChangingResource(resource)}>Change File</Button>
           <Button variant="outline" onClick={() => setTaggingResource(resource)}>Manage Tags</Button>
           <Button variant="destructive" onClick={() => setDeleteId(resource.id)}>Delete</Button>
+        </div>
+      )}
+
+      {/* ── Resource tree ──────────────────────────────────── */}
+      {treeData && (
+        <Dirtree
+          parents={treeData.parents}
+          children={treeData.children}
+          currentId={resource.id}
+        />
+      )}
+      {treeLoading && (
+        <div className="flex items-center justify-center py-6">
+          <p className="text-sm text-muted-foreground">Loading resource tree...</p>
         </div>
       )}
 
