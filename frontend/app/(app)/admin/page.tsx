@@ -113,8 +113,26 @@ function ResourcesPanel() {
   const loading = useAppSelector((state) => state.admin.resourcesLoading);
   const error = useAppSelector((state) => state.admin.resourcesError);
   const userRole = useAppSelector((state) => state.auth.user?.role ?? -1);
-  const [showArchived, setShowArchived] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  const filteredResources = resources.filter((r) => {
+    if (filter === 'active') return !r.is_archived;
+    if (filter === 'archived') return r.is_archived;
+    if (visibilityFilter === 'public') return r.is_public;
+    if (visibilityFilter === 'private') return !r.is_public;
+    return true;
+  });
+
+  const emptyMessage = () => {
+    if (resources.length === 0) return 'No resources found.';
+    const parts: string[] = [];
+    if (filter !== 'all') parts.push(filter);
+    if (visibilityFilter !== 'all') parts.push(visibilityFilter);
+    if (parts.length > 0) return `No ${parts.join(' ')} resources found.`;
+    return 'No resources found.';
+  };
 
   const handleDelete = async (resourceId: number) => {
     const promise = dispatch(deleteResource(resourceId)).unwrap();
@@ -125,15 +143,6 @@ function ResourcesPanel() {
     });
     await promise;
     setDeleteConfirmId(null);
-    // Refetch all resources after successful deletion (always load full set for accurate overview stats)
-    dispatch(fetchResources({ includeArchived: true }));
-  };
-
-  const handleToggleArchived = () => {
-    setShowArchived((prev) => {
-      dispatch(fetchResources({ includeArchived: !prev }));
-      return !prev;
-    });
   };
 
   if (loading && resources.length === 0) return <p className="text-muted-foreground">Loading...</p>;
@@ -142,24 +151,38 @@ function ResourcesPanel() {
   if (resources.length === 0) {
     return (
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">Resources</h2>
-          <Button variant="outline" size="sm" onClick={handleToggleArchived}>
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">No resources found.</p>
+        <h2 className="text-lg font-medium mb-4">Resources</h2>
+        <p className="text-sm text-muted-foreground">{emptyMessage()}</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <h2 className="text-lg font-medium">Resources</h2>
-        <Button variant="outline" size="sm" onClick={handleToggleArchived}>
-          {showArchived ? 'Show Active' : 'Show Archived'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Status:</label>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as 'all' | 'active' | 'archived')}
+            className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Visibility:</label>
+          <select
+            value={visibilityFilter}
+            onChange={(e) => setVisibilityFilter(e.target.value as 'all' | 'public' | 'private')}
+            className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="all">All</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+        </div>
       </div>
 
       {/* Delete confirmation dialog */}
@@ -192,7 +215,14 @@ function ResourcesPanel() {
           </tr>
         </thead>
         <tbody>
-          {resources.map((resource) => (
+          {filteredResources.length === 0 ? (
+            <tr>
+              <td colSpan={userRole === 3 ? 6 : 5} className="py-8 text-center text-sm text-muted-foreground">
+                {emptyMessage()}
+              </td>
+            </tr>
+          ) : (
+            filteredResources.map((resource) => (
             <tr key={resource.id} className="border-b last:border-b-0 hover:bg-muted/50">
               <td className="py-2 pr-4 font-medium">{resource.title}</td>
               <td className="py-2 pr-4 text-muted-foreground truncate max-w-[150px]">{resource.filename || '—'}</td>
@@ -215,7 +245,7 @@ function ResourcesPanel() {
                 </td>
               )}
             </tr>
-          ))}
+          )))}
         </tbody>
       </table>
     </div>
