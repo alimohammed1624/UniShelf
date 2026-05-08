@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bookmark, FolderOpen, User, Shield } from 'lucide-react';
+import { Search, Bookmark, FolderOpen, User, Shield, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { logout } from '@/lib/features/auth/authSlice';
@@ -14,6 +14,11 @@ const NAV_LINKS = [
   { href: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
   { href: '/my-resources', label: 'My Resources', icon: FolderOpen },
   { href: '/profile', label: 'Profile', icon: User },
+];
+
+const ADMIN_LINKS = [
+  { href: '/moderate', label: 'Moderate', icon: Shield, role: 1 },
+  { href: '/admin', label: 'Admin', icon: Settings, role: 2 },
 ];
 
 export function Navbar() {
@@ -33,18 +38,6 @@ export function Navbar() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <span className="text-lg font-semibold">UniShelf</span>
         <nav className="flex items-center gap-1">
-          {userRole >= 1 && (
-            <Link
-              href="/moderate"
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
-                pathname === '/moderate' ? 'bg-muted text-foreground' : 'text-muted-foreground'
-              )}
-            >
-              <Shield size={15} />
-              Moderate
-            </Link>
-          )}
           {NAV_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
@@ -59,9 +52,26 @@ export function Navbar() {
             </Link>
           ))}
         </nav>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          Logout
-        </Button>
+        <div className="flex items-center gap-1">
+          {ADMIN_LINKS.map(({ href, label, icon: Icon, role }) =>
+            userRole >= role ? (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
+                  pathname === href ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                )}
+              >
+                <Icon size={15} />
+                {label}
+              </Link>
+            ) : null
+          )}
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
       </div>
     </header>
   );
