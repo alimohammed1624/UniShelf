@@ -71,6 +71,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfPageTransition, setPdfPageTransition] = useState(false);
   const [imageZoom, setImageZoom] = useState(100);
   const [imageFullscreen, setImageFullscreen] = useState(false);
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
@@ -136,6 +137,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     setPdfFullscreen(false);
     setPdfPreviewFailed(false);
     setPdfBlobUrl(null);
+    setPdfPageTransition(false);
     setImageZoom(100);
     setImageFullscreen(false);
     setImageBlobUrl(null);
@@ -265,6 +267,8 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const isImage = resource?.type?.startsWith('image/');
   const isText = resource?.type?.startsWith('text/');
   const canPreview = isPdf || isImage || isText;
+  const isFirstPdfPage = pdfPage <= 1;
+  const isLastPdfPage = !!pdfNumPages && pdfPage >= pdfNumPages;
 
   useEffect(() => {
     if (!isPdf || !apiInlinePath) {
@@ -385,9 +389,12 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     let cancelled = false;
     const loadPdfMeta = async () => {
       try {
-        const pdfjs = await import('pdfjs-dist');
-        const { GlobalWorkerOptions, getDocument, version: pdfjsVersion } = pdfjs;
-        GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`;
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
+        const { GlobalWorkerOptions, getDocument } = pdfjs;
+        GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
         const res = await fetch(pdfBlobUrl);
         const data = await res.arrayBuffer();
         const pdf = await getDocument({ data }).promise;
@@ -452,20 +459,25 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
-                        disabled={pdfPage <= 1}
+                        onClick={() => {
+                          if (isFirstPdfPage) return;
+                          setPdfPageTransition(true);
+                          setPdfPage((p) => Math.max(1, p - 1));
+                        }}
+                        disabled={isFirstPdfPage}
                       >
                         Prev
                       </Button>
-                      <span className="min-w-20 text-center text-sm text-muted-foreground">
-                        Page {pdfPage}{pdfNumPages ? ` / ${pdfNumPages}` : ''}
-                      </span>
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => setPdfPage((p) => p + 1)}
-                        disabled={!!pdfNumPages && pdfPage >= pdfNumPages}
+                        onClick={() => {
+                          if (isLastPdfPage) return;
+                          setPdfPageTransition(true);
+                          setPdfPage((p) => (pdfNumPages ? Math.min(pdfNumPages, p + 1) : p + 1));
+                        }}
+                        disabled={isLastPdfPage}
                       >
                         Next
                       </Button>
@@ -508,10 +520,15 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                   {pdfLoading ? (
                     <div className="p-4 text-sm text-muted-foreground">Loading PDF preview...</div>
                   ) : !pdfPreviewFailed && pdfBlobUrl ? (
-                    <div className="h-[60vh] w-full overflow-hidden rounded-md border bg-muted/10">
+                    <div className={`${isPreviewFullscreen ? 'h-[75vh]' : 'h-[60vh]'} w-full overflow-hidden rounded-md border bg-muted/10`}>
                       <iframe
                         key={pdfFrameKey}
                         src={pdfPreviewUrl}
+                        onLoad={() => {
+                          if (pdfPageTransition) {
+                            setPdfPageTransition(false);
+                          }
+                        }}
                         className="h-full w-full border-0"
                         title={`Preview of ${resource.title}`}
                       />
@@ -566,7 +583,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                       {imageFullscreen ? 'Exit full screen' : 'Full screen'}
                     </Button>
                   </div>
-                  <div className="flex h-[60vh] items-center justify-center overflow-auto rounded-md border bg-muted/10">
+                  <div className={`flex ${imageFullscreen ? 'h-[75vh]' : 'h-[60vh]'} items-center justify-center overflow-auto rounded-md border bg-muted/10`}>
                     {imageLoading ? (
                       <div className="p-4 text-sm text-muted-foreground">Loading image preview...</div>
                     ) : imagePreviewFailed || !imageBlobUrl ? (
