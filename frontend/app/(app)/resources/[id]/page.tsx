@@ -36,7 +36,7 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
-import { toggleBookmark } from '@/lib/features/bookmarks/bookmarksSlice';
+import { toggleBookmarkAsync } from '@/lib/features/bookmarks/bookmarksSlice';
 
 export default function ResourceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -232,7 +232,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
 
   const handleToggleBookmark = () => {
     if (!resource) return;
-    dispatch(toggleBookmark(resource.id));
+    dispatch(toggleBookmarkAsync(resource.id));
     toast.success(
       isBookmarked
         ? `Removed "${resource.title}" from bookmarks`
