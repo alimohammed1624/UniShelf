@@ -1,6 +1,4 @@
 'use client';
-
-import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useState, useEffect, type FormEvent } from 'react';
 import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -37,9 +35,6 @@ interface ResourceTableCardProps {
   currentUserId: number | null;
   currentUserRole: number;
   allTags: Tag[];
-  showBookmarkAction?: boolean;
-  bookmarkedResourceIds?: number[];
-  onToggleBookmark?: (resourceId: number, resourceTitle: string) => void;
   onDownload: (id: number, title: string) => void;
   onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
@@ -55,9 +50,6 @@ export function ResourceTableCard({
   currentUserId,
   currentUserRole,
   allTags,
-  showBookmarkAction = false,
-  bookmarkedResourceIds = [],
-  onToggleBookmark,
   onDownload,
   onEdit,
   onDelete,
@@ -68,8 +60,6 @@ export function ResourceTableCard({
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
-  const hasBookmarkAction = showBookmarkAction && typeof onToggleBookmark === 'function';
-  const bookmarkedSet = new Set(bookmarkedResourceIds);
 
   // Edit modal state
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
@@ -201,21 +191,6 @@ export function ResourceTableCard({
       {resource.type !== 'directory' && (
         <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
           Download
-        </Button>
-      )}
-      {hasBookmarkAction && (
-        <Button
-          size="sm"
-          variant={bookmarkedSet.has(resource.id) ? 'secondary' : 'outline'}
-          onClick={() => onToggleBookmark(resource.id, resource.title)}
-          aria-label={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-          title={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-        >
-          {bookmarkedSet.has(resource.id) ? (
-            <BookmarkCheck className="h-4 w-4" />
-          ) : (
-            <Bookmark className="h-4 w-4" />
-          )}
         </Button>
       )}
       {isOwnerOrAdmin(resource) && (

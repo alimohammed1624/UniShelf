@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { Resource, TagBrief } from '@/types';
 import api from '@/lib/api';
@@ -35,12 +36,14 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
+import { toggleBookmark } from '@/lib/features/bookmarks/bookmarksSlice';
 
 export default function ResourceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const bookmarkedResourceIds = useAppSelector((state) => state.bookmarks.ids);
 
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,6 +228,18 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     ? allTags.filter((t) => !activeTaggingResource.tags.some((rt) => rt.id === t.id))
     : [];
 
+  const isBookmarked = resource ? bookmarkedResourceIds.includes(resource.id) : false;
+
+  const handleToggleBookmark = () => {
+    if (!resource) return;
+    dispatch(toggleBookmark(resource.id));
+    toast.success(
+      isBookmarked
+        ? `Removed "${resource.title}" from bookmarks`
+        : `Added "${resource.title}" to bookmarks`
+    );
+  };
+
   // ── Preview helpers ──────────────────────────────────────
 
   const downloadUrl = resource ? `/api/resources/${resource.id}/download` : '';
@@ -364,13 +379,28 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Download button */}
-            {resource.type !== 'directory' && (
-              <Button asChild className="w-full" size="lg">
-                <a href={downloadUrl} download>
-                  Download
-                </a>
+            <div className="flex gap-2">
+              {resource.type !== 'directory' && (
+                <Button asChild className="flex-1" size="lg">
+                  <a href={downloadUrl} download>
+                    Download
+                  </a>
+                </Button>
+              )}
+              <Button
+                size="lg"
+                variant={isBookmarked ? 'secondary' : 'outline'}
+                onClick={handleToggleBookmark}
+                aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+                title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              >
+                {isBookmarked ? (
+                  <BookmarkCheck className="h-5 w-5" />
+                ) : (
+                  <Bookmark className="h-5 w-5" />
+                )}
               </Button>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>
