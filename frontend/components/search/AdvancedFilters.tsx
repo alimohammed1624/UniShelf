@@ -12,7 +12,6 @@ export interface AdvancedFilterState {
   searchQuery: string;
   resourceTypes: string[];
   dateRange: { from: string; to: string } | null;
-  hierarchy: string;
 }
 
 interface AdvancedFiltersProps {
@@ -32,18 +31,6 @@ const RESOURCE_TYPES = [
   { id: 'link', label: 'Link', mime: 'link' },
 ];
 
-const SAMPLE_COURSES = [
-  'CSE',
-  'ECE',
-  'MECH',
-  'CIVIL',
-  'MATH',
-  'PHYSICS',
-  'CHEMISTRY',
-];
-
-const SAMPLE_SEMESTERS = ['SEM1', 'SEM2', 'SEM3', 'SEM4', 'SEM5', 'SEM6', 'SEM7', 'SEM8'];
-
 export function AdvancedFilters({
   filters,
   onFilterChange,
@@ -56,7 +43,6 @@ export function AdvancedFilters({
     search: true,
     types: true,
     tags: true,
-    course: false,
     date: false,
   });
 
@@ -68,7 +54,6 @@ export function AdvancedFilters({
     (filters.searchQuery ? 1 : 0) +
     filters.resourceTypes.length +
     selectedTags.length +
-    (filters.hierarchy ? 1 : 0) +
     (filters.dateRange ? 1 : 0);
 
   const handleResourceTypeToggle = (typeId: string) => {
@@ -78,10 +63,6 @@ export function AdvancedFilters({
         ? filters.resourceTypes.filter((t) => t !== typeId)
         : [...filters.resourceTypes, typeId],
     });
-  };
-
-  const handleHierarchyChange = (value: string) => {
-    onFilterChange({ ...filters, hierarchy: value });
   };
 
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,60 +171,6 @@ export function AdvancedFilters({
             </div>
           </FilterSection>
         )}
-
-        {/* Course & Semester */}
-        <FilterSection
-          title="Course & Semester"
-          isExpanded={expandedSections.course}
-          onToggle={() => toggleSection('course')}
-          isActive={!!filters.hierarchy}
-        >
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Course</Label>
-              <select
-                value={filters.hierarchy.split('.')[0] || ''}
-                onChange={(e) => {
-                  const course = e.target.value;
-                  const semester = filters.hierarchy.split('.')[1] || '';
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : course
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All courses</option>
-                {SAMPLE_COURSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Semester</Label>
-              <select
-                value={filters.hierarchy.split('.')[1] || ''}
-                onChange={(e) => {
-                  const course = filters.hierarchy.split('.')[0] || '';
-                  const semester = e.target.value;
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : semester
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All semesters</option>
-                {SAMPLE_SEMESTERS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </FilterSection>
 
         {/* Date Range */}
         <FilterSection
