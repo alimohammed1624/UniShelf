@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +83,20 @@ export function AdvancedFilters({
   const handleHierarchyChange = (value: string) => {
     onFilterChange({ ...filters, hierarchy: value });
   };
+
+  const parseHierarchy = () => {
+    if (!filters.hierarchy) return { course: '', semester: '' };
+    if (filters.hierarchy.includes('.')) {
+      const [course = '', semester = ''] = filters.hierarchy.split('.');
+      return { course, semester };
+    }
+    if (SAMPLE_COURSES.includes(filters.hierarchy)) {
+      return { course: filters.hierarchy, semester: '' };
+    }
+    return { course: '', semester: filters.hierarchy };
+  };
+
+  const hierarchyParts = parseHierarchy();
 
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const from = e.target.value;

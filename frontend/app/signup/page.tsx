@@ -20,14 +20,30 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = fullName.trim();
 
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
+    if (!normalizedEmail.endsWith('.edu')) {
+      toast.error('Please use a valid university email address (.edu)');
+      return;
+    }
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (!normalizedName) {
+      toast.error('Full name is required');
+      return;
+    }
 
     try {
-      const promise = dispatch(registerUser({ email, password, full_name: fullName })).unwrap();
+      const promise = dispatch(
+        registerUser({ email: normalizedEmail, password, full_name: normalizedName }),
+      ).unwrap();
       
       toast.promise(promise, {
         loading: 'Creating account...',

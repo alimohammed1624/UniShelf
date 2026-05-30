@@ -378,6 +378,7 @@ def delete_resource(
 @router.get("/{resource_id}/download")
 def download_resource(
     resource_id: int,
+    inline: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -396,8 +397,9 @@ def download_resource(
     DOWNLOAD_COUNT.inc()
 
     download_filename = sanitize_filename(resource.filename or "download")
+    disposition = "inline" if inline else "attachment"
     headers = {
-        "Content-Disposition": f'attachment; filename="{download_filename}"',
+        "Content-Disposition": f'{disposition}; filename="{download_filename}"',
     }
     if resource.size:
         headers["Content-Length"] = str(resource.size)
