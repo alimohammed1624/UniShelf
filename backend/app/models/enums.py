@@ -16,3 +16,8 @@ class UserRole(IntEnum):
 class AccessType(IntEnum):
     WHITELIST = 0
     BLACKLIST = 1
+
+
+class ReportStatus(IntEnum):
+    OPEN = 0
+    RESOLVED = 1

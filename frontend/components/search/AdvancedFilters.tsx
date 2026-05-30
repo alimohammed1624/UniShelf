@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ export interface AdvancedFilterState {
   searchQuery: string;
   resourceTypes: string[];
   dateRange: { from: string; to: string } | null;
+  hierarchy: string;
 }
 
 interface AdvancedFiltersProps {
@@ -31,6 +32,18 @@ const RESOURCE_TYPES = [
   { id: 'link', label: 'Link', mime: 'link' },
 ];
 
+const SAMPLE_COURSES = [
+  'CSE',
+  'ECE',
+  'MECH',
+  'CIVIL',
+  'MATH',
+  'PHYSICS',
+  'CHEMISTRY',
+];
+
+const SAMPLE_SEMESTERS = ['SEM1', 'SEM2', 'SEM3', 'SEM4', 'SEM5', 'SEM6', 'SEM7', 'SEM8'];
+
 export function AdvancedFilters({
   filters,
   onFilterChange,
@@ -42,6 +55,7 @@ export function AdvancedFilters({
   const [expandedSections, setExpandedSections] = useState({
     types: true,
     tags: true,
+    course: false,
     date: false,
   });
 
@@ -50,8 +64,10 @@ export function AdvancedFilters({
   };
 
   const activeFilterCount =
+    (filters.searchQuery ? 1 : 0) +
     filters.resourceTypes.length +
     selectedTags.length +
+    (filters.hierarchy ? 1 : 0) +
     (filters.dateRange ? 1 : 0);
 
   const handleResourceTypeToggle = (typeId: string) => {
@@ -62,6 +78,24 @@ export function AdvancedFilters({
         : [...filters.resourceTypes, typeId],
     });
   };
+
+  const handleHierarchyChange = (value: string) => {
+    onFilterChange({ ...filters, hierarchy: value });
+  };
+
+  const parseHierarchy = () => {
+    if (!filters.hierarchy) return { course: '', semester: '' };
+    if (filters.hierarchy.includes('.')) {
+      const [course = '', semester = ''] = filters.hierarchy.split('.');
+      return { course, semester };
+    }
+    if (SAMPLE_COURSES.includes(filters.hierarchy)) {
+      return { course: filters.hierarchy, semester: '' };
+    }
+    return { course: '', semester: filters.hierarchy };
+  };
+
+  const hierarchyParts = parseHierarchy();
 
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const from = e.target.value;
@@ -152,6 +186,7 @@ export function AdvancedFilters({
             </div>
           </FilterSection>
         )}
+
 
         {/* Date Range */}
         <FilterSection

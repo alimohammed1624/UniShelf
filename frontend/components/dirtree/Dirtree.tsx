@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ChevronRight, Folder, FileText, FolderOpen } from 'lucide-react';
@@ -34,10 +35,10 @@ export function Dirtree({ parents, children, currentId }: DirtreeProps) {
             <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Parent Directories</h3>
             <div className="flex flex-wrap items-center gap-1.5 text-sm">
               {parents.map((parent, idx) => (
-                <>
+                <React.Fragment key={parent.id}>
                   {idx > 0 && <span className="text-muted-foreground/50">/</span>}
                   <ParentLink node={parent} />
-                </>
+                </React.Fragment>
               ))}
               <span className="text-muted-foreground/50">/</span>
               <span className="text-sm font-medium text-foreground bg-accent px-2 py-0.5 rounded">

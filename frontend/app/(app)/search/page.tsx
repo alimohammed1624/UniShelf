@@ -17,7 +17,7 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
-import { toggleBookmark } from '@/lib/features/bookmarks/bookmarksSlice';
+import { toggleBookmarkAsync } from '@/lib/features/bookmarks/bookmarksSlice';
 import { toast } from 'sonner';
 import { UserPublicProfile } from '@/types';
 import api from '@/lib/api';
@@ -29,6 +29,7 @@ export default function SearchPage() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>({
     searchQuery: '',
     resourceTypes: [],
+    hierarchy: '',
     dateRange: null,
   });
   
@@ -138,6 +139,14 @@ export default function SearchPage() {
       if (!matchesTags) return false;
     }
 
+    // Course/semester hierarchy filter
+    if (advancedFilters.hierarchy) {
+      const hierarchy = r.hierarchy?.toLowerCase() ?? '';
+      if (!hierarchy.includes(advancedFilters.hierarchy.toLowerCase())) {
+        return false;
+      }
+    }
+
     // Date range filter
     if (advancedFilters.dateRange) {
       const resourceDate = new Date(r.created_at).toISOString().split('T')[0];
@@ -209,7 +218,7 @@ export default function SearchPage() {
 
   const handleToggleBookmark = (resourceId: number, resourceTitle: string) => {
     const isBookmarked = bookmarkedResourceIds.includes(resourceId);
-    dispatch(toggleBookmark(resourceId));
+    dispatch(toggleBookmarkAsync(resourceId));
     toast.success(
       isBookmarked
         ? `Removed "${resourceTitle}" from bookmarks`
@@ -221,6 +230,7 @@ export default function SearchPage() {
     setAdvancedFilters({
       searchQuery: '',
       resourceTypes: [],
+      hierarchy: '',
       dateRange: null,
     });
     setSelectedTags([]);
@@ -279,6 +289,7 @@ export default function SearchPage() {
             </p>
             {(advancedFilters.searchQuery ||
               advancedFilters.resourceTypes.length > 0 ||
+              advancedFilters.hierarchy ||
               selectedTags.length > 0 ||
               advancedFilters.dateRange) && (
               <Button
@@ -317,6 +328,7 @@ export default function SearchPage() {
               onCreateTag={handleCreateTag}
               onAssignTags={handleAssignTags}
               onRemoveTag={handleRemoveTag}
+              bookmarkedResourceIds={bookmarkedResourceIds}
               onToggleBookmark={handleToggleBookmark}
             />
           )}
