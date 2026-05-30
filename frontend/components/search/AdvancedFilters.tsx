@@ -205,59 +205,6 @@ export function AdvancedFilters({
           </FilterSection>
         )}
 
-        {/* Course & Semester */}
-        <FilterSection
-          title="Course & Semester"
-          isExpanded={expandedSections.course}
-          onToggle={() => toggleSection('course')}
-          isActive={!!filters.hierarchy}
-        >
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Course</Label>
-              <select
-                value={filters.hierarchy.split('.')[0] || ''}
-                onChange={(e) => {
-                  const course = e.target.value;
-                  const semester = filters.hierarchy.split('.')[1] || '';
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : course
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All courses</option>
-                {SAMPLE_COURSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Semester</Label>
-              <select
-                value={filters.hierarchy.split('.')[1] || ''}
-                onChange={(e) => {
-                  const course = filters.hierarchy.split('.')[0] || '';
-                  const semester = e.target.value;
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : semester
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All semesters</option>
-                {SAMPLE_SEMESTERS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </FilterSection>
 
         {/* Date Range */}
         <FilterSection
