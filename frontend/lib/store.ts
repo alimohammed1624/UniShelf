@@ -3,6 +3,8 @@ import authReducer from './features/auth/authSlice'
 import resourceReducer from './features/resources/resourceSlice'
 import bookmarksReducer from './features/bookmarks/bookmarksSlice'
 import tagReducer from './features/tags/tagSlice'
+import moderateReducer from './features/moderate/moderateSlice'
+import adminReducer from './features/admin/adminSlice'
 
 export const makeStore = () => {
   const store = configureStore({
@@ -11,6 +13,8 @@ export const makeStore = () => {
       resources: resourceReducer,
       bookmarks: bookmarksReducer,
       tags: tagReducer,
+      moderate: moderateReducer,
+      admin: adminReducer,
     },
   })
 

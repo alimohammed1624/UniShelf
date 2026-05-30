@@ -11,6 +11,7 @@ from app.controllers.users.router import router as users_router
 from app.controllers.resources.router import router as resources_router
 from app.controllers.tags.router import router as tags_router
 from app.controllers.admin.router import router as admin_router
+from app.controllers.moderate.router import router as moderate_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -40,6 +41,7 @@ app.include_router(users_router)
 app.include_router(resources_router)
 app.include_router(tags_router)
 app.include_router(admin_router)
+app.include_router(moderate_router)
 
 # Prometheus metrics — must be set up after all routers are registered
 Instrumentator(
