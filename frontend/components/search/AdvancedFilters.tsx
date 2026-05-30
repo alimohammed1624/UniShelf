@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +53,6 @@ export function AdvancedFilters({
   onTagToggle,
 }: AdvancedFiltersProps) {
   const [expandedSections, setExpandedSections] = useState({
-    search: true,
     types: true,
     tags: true,
     course: false,
@@ -83,6 +82,20 @@ export function AdvancedFilters({
   const handleHierarchyChange = (value: string) => {
     onFilterChange({ ...filters, hierarchy: value });
   };
+
+  const parseHierarchy = () => {
+    if (!filters.hierarchy) return { course: '', semester: '' };
+    if (filters.hierarchy.includes('.')) {
+      const [course = '', semester = ''] = filters.hierarchy.split('.');
+      return { course, semester };
+    }
+    if (SAMPLE_COURSES.includes(filters.hierarchy)) {
+      return { course: filters.hierarchy, semester: '' };
+    }
+    return { course: '', semester: filters.hierarchy };
+  };
+
+  const hierarchyParts = parseHierarchy();
 
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const from = e.target.value;
@@ -128,23 +141,6 @@ export function AdvancedFilters({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Search Query */}
-        <FilterSection
-          title="Search"
-          isExpanded={expandedSections.search}
-          onToggle={() => toggleSection('search')}
-          isActive={!!filters.searchQuery}
-        >
-          <Input
-            placeholder="Title, description..."
-            value={filters.searchQuery}
-            onChange={(e) =>
-              onFilterChange({ ...filters, searchQuery: e.target.value })
-            }
-            className="text-sm"
-          />
-        </FilterSection>
-
         {/* Resource Type */}
         <FilterSection
           title="Resource Type"
@@ -191,59 +187,6 @@ export function AdvancedFilters({
           </FilterSection>
         )}
 
-        {/* Course & Semester */}
-        <FilterSection
-          title="Course & Semester"
-          isExpanded={expandedSections.course}
-          onToggle={() => toggleSection('course')}
-          isActive={!!filters.hierarchy}
-        >
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Course</Label>
-              <select
-                value={filters.hierarchy.split('.')[0] || ''}
-                onChange={(e) => {
-                  const course = e.target.value;
-                  const semester = filters.hierarchy.split('.')[1] || '';
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : course
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All courses</option>
-                {SAMPLE_COURSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-2 block">Semester</Label>
-              <select
-                value={filters.hierarchy.split('.')[1] || ''}
-                onChange={(e) => {
-                  const course = filters.hierarchy.split('.')[0] || '';
-                  const semester = e.target.value;
-                  handleHierarchyChange(
-                    course && semester ? `${course}.${semester}` : semester
-                  );
-                }}
-                className="w-full px-2 py-1 text-sm border rounded-md"
-              >
-                <option value="">All semesters</option>
-                {SAMPLE_SEMESTERS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </FilterSection>
 
         {/* Date Range */}
         <FilterSection

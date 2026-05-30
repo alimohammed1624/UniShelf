@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { List, Grid3x3, File as FileIcon } from 'lucide-react';
+import { Bookmark, BookmarkCheck, List, Grid3x3, File as FileIcon } from 'lucide-react';
 import api from '@/lib/api';
 
 interface ResourceTableCardProps {
@@ -42,6 +42,8 @@ interface ResourceTableCardProps {
   onCreateTag: (name: string) => Promise<Tag | null>;
   onAssignTags: (resourceId: number, tagIds: number[]) => Promise<boolean>;
   onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
+  bookmarkedResourceIds?: number[];
+  onToggleBookmark?: (id: number, title: string) => void;
 }
 
 export function ResourceTableCard({
@@ -57,6 +59,8 @@ export function ResourceTableCard({
   onCreateTag,
   onAssignTags,
   onRemoveTag,
+  bookmarkedResourceIds = [],
+  onToggleBookmark,
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -185,9 +189,27 @@ export function ResourceTableCard({
   const availableTags = activeTaggingResource
     ? allTags.filter((t) => !activeTaggingResource.tags.some((rt: { id: number }) => rt.id === t.id))
     : [];
-  
+
   const renderActions = (resource: Resource) => (
     <>
+      {onToggleBookmark && (
+        <Button
+          size="sm"
+          variant={bookmarkedResourceIds.includes(resource.id) ? 'secondary' : 'outline'}
+          onClick={() => onToggleBookmark(resource.id, resource.title)}
+          aria-label={
+            bookmarkedResourceIds.includes(resource.id)
+              ? `Remove ${resource.title} from bookmarks`
+              : `Add ${resource.title} to bookmarks`
+          }
+        >
+          {bookmarkedResourceIds.includes(resource.id) ? (
+            <BookmarkCheck className="h-4 w-4" />
+          ) : (
+            <Bookmark className="h-4 w-4" />
+          )}
+        </Button>
+      )}
       {resource.type !== 'directory' && (
         <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
           Download

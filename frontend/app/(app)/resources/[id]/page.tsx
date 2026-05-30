@@ -746,6 +746,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* ── Owner actions bar ──────────────────────────────── */}
