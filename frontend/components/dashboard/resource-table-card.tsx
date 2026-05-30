@@ -1,6 +1,4 @@
 'use client';
-
-import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useState, useEffect, type FormEvent } from 'react';
 import { Resource, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -37,9 +35,6 @@ interface ResourceTableCardProps {
   currentUserId: number | null;
   currentUserRole: number;
   allTags: Tag[];
-  showBookmarkAction?: boolean;
-  bookmarkedResourceIds?: number[];
-  onToggleBookmark?: (resourceId: number, resourceTitle: string) => void;
   onDownload: (id: number, title: string) => void;
   onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
@@ -55,9 +50,6 @@ export function ResourceTableCard({
   currentUserId,
   currentUserRole,
   allTags,
-  showBookmarkAction = false,
-  bookmarkedResourceIds = [],
-  onToggleBookmark,
   onDownload,
   onEdit,
   onDelete,
@@ -68,8 +60,6 @@ export function ResourceTableCard({
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
-  const hasBookmarkAction = showBookmarkAction && typeof onToggleBookmark === 'function';
-  const bookmarkedSet = new Set(bookmarkedResourceIds);
 
   // Edit modal state
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
@@ -195,6 +185,32 @@ export function ResourceTableCard({
   const availableTags = activeTaggingResource
     ? allTags.filter((t) => !activeTaggingResource.tags.some((rt: { id: number }) => rt.id === t.id))
     : [];
+  
+  const renderActions = (resource: Resource) => (
+    <>
+      {resource.type !== 'directory' && (
+        <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+          Download
+        </Button>
+      )}
+      {isOwnerOrAdmin(resource) && (
+        <>
+          <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+            Change
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+            Tags
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+            Delete
+          </Button>
+        </>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -264,42 +280,7 @@ export function ResourceTableCard({
                     <TableCell>User #{resource.uploader_id}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {resource.type !== 'directory' && (
-                          <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                            Download
-                          </Button>
-                        )}
-                        {hasBookmarkAction && (
-                          <Button
-                            size="sm"
-                            variant={bookmarkedSet.has(resource.id) ? 'secondary' : 'outline'}
-                            onClick={() => onToggleBookmark(resource.id, resource.title)}
-                            aria-label={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-                            title={bookmarkedSet.has(resource.id) ? 'Remove bookmark' : 'Add bookmark'}
-                          >
-                            {bookmarkedSet.has(resource.id) ? (
-                              <BookmarkCheck className="h-4 w-4" />
-                            ) : (
-                              <Bookmark className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                        {isOwnerOrAdmin(resource) && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                              Edit
-                            </Button>
-                            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                              Change
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-                              Tags
-                            </Button>
-                            <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                              Delete
-                            </Button>
-                          </>
-                        )}
+                        {renderActions(resource)}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -333,27 +314,7 @@ export function ResourceTableCard({
                     {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {resource.type !== 'directory' && (
-                      <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-                        Download
-                      </Button>
-                    )}
-                    {isOwnerOrAdmin(resource) && (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                          Change
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-                          Tags
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                          Delete
-                        </Button>
-                      </>
-                    )}
+                    {renderActions(resource)}
                   </div>
                 </div>
               ))}
