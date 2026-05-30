@@ -53,6 +53,7 @@ export function AdvancedFilters({
   onTagToggle,
 }: AdvancedFiltersProps) {
   const [expandedSections, setExpandedSections] = useState({
+    search: true,
     types: true,
     tags: true,
     course: false,
@@ -141,6 +142,23 @@ export function AdvancedFilters({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Search Query */}
+        <FilterSection
+          title="Search"
+          isExpanded={expandedSections.search}
+          onToggle={() => toggleSection('search')}
+          isActive={!!filters.searchQuery}
+        >
+          <Input
+            placeholder="Title, description..."
+            value={filters.searchQuery}
+            onChange={(e) =>
+              onFilterChange({ ...filters, searchQuery: e.target.value })
+            }
+            className="text-sm"
+          />
+        </FilterSection>
+
         {/* Resource Type */}
         <FilterSection
           title="Resource Type"
