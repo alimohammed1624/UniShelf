@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/navbar';
 import { useAppDispatch } from '@/lib/hooks';
 import { fetchCurrentUser, initializeAuth, logout } from '@/lib/features/auth/authSlice';
+import { fetchBookmarks } from '@/lib/features/bookmarks/bookmarksSlice';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,16 +20,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
     dispatch(initializeAuth());
     dispatch(fetchCurrentUser()).unwrap()
-      .then(() => setReady(true))
+      .then(() => {
+        dispatch(fetchBookmarks()); // ← load bookmarks once user is confirmed
+        setReady(true);
+      })
       .catch(() => {
         dispatch(logout());
         router.replace('/login');
       });
   }, [dispatch, router]);
 
-  if (!ready) {
-    return null;
-  }
+  if (!ready) return null;
 
   return (
     <div className="min-h-screen bg-background">

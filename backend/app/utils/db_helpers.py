@@ -79,13 +79,13 @@ def sanitize_filename(filename: str) -> str:
 
 
 def validate_hierarchy(hierarchy: str) -> str:
-    """Validate and return a hierarchy string. Raise 422 if invalid."""
+    """Validate and return a logical dot-separated resource path. Raise 422 if invalid."""
     if hierarchy == "":
         return hierarchy
     if not re.match(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$", hierarchy):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Hierarchy must be dot-separated lowercase alphanumeric segments",
+            detail="Hierarchy must be a dot-separated lowercase alphanumeric resource path (letters, digits, underscores only)",
         )
     if len(hierarchy.split(".")) > 10:
         raise HTTPException(

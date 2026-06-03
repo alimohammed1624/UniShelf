@@ -61,7 +61,8 @@ export const registerUser = createAsyncThunk<void, RegisterPayload, { rejectValu
       await api.post('/auth/register', userData);
     } catch (err) {
       const error = err as AxiosError<{ detail: unknown }>;
-      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Registration failed'));
+      const extracted = extractErrorMessage(error.response?.data?.detail, '');
+      return rejectWithValue(extracted || error.message || 'Registration failed');
     }
   }
 );

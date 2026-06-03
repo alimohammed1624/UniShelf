@@ -73,7 +73,7 @@ class ResourceUpdate(BaseModel):
     def hierarchy_format(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v != "":
             if not re.match(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$", v):
-                raise ValueError("Hierarchy must be dot-separated lowercase alphanumeric segments")
+                raise ValueError("Hierarchy must be a dot-separated lowercase alphanumeric resource path")
             if len(v.split(".")) > 10:
                 raise ValueError("Hierarchy depth cannot exceed 10 levels")
         return v

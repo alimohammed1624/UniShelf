@@ -261,11 +261,11 @@ def seed_resources(db: Session) -> None:
 
     # Resource definitions: (title, description, hierarchy, parent_hierarchy_or_none, owner_email, tag_names, content_type)
     resource_defs = [
-        # Directory: cse.sem1
+        # Directory: cse.intro
         (
-            "CSE Semester 1",
-            "First semester CSE materials",
-            "cse.sem1",
+            "CSE Intro Collection",
+            "Introductory CSE materials",
+            "cse.intro",
             None,
             "admin@unishelf.edu",
             [],
@@ -273,9 +273,9 @@ def seed_resources(db: Session) -> None:
         ),
         (
             "CS Fundamentals",
-            "Introduction to computer science concepts",
-            "cse.sem1.cs-fundamentals",
-            "cse.sem1",
+            "Introductory computer science concepts",
+            "cse.intro.cs_fundamentals",
+            "cse.intro",
             "admin@unishelf.edu",
             ["data-structures", "notes"],
             "application/pdf",
@@ -283,17 +283,17 @@ def seed_resources(db: Session) -> None:
         (
             "Math Basics",
             "Basic mathematics for CSE students",
-            "cse.sem1.math-basics",
-            "cse.sem1",
+            "cse.intro.math_basics",
+            "cse.intro",
             "admin@unishelf.edu",
             ["calculus", "notes"],
             "text/plain",
         ),
-        # Directory: cse.sem3
+        # Directory: cse.core
         (
-            "CSE Semester 3",
-            "Third semester CSE materials",
-            "cse.sem3",
+            "CSE Core Collection",
+            "Core CSE materials",
+            "cse.core",
             None,
             "mod@unishelf.edu",
             [],
@@ -301,9 +301,9 @@ def seed_resources(db: Session) -> None:
         ),
         (
             "DBMS",
-            "Database Management Systems course material",
-            "cse.sem3.dbms",
-            "cse.sem3",
+            "Database management systems material",
+            "cse.core.dbms",
+            "cse.core",
             "mod@unishelf.edu",
             ["databases", "notes"],
             "application/pdf",
@@ -311,8 +311,8 @@ def seed_resources(db: Session) -> None:
         (
             "DBMS Lab Notes",
             "Lab notes for DBMS practical sessions",
-            "cse.sem3.dbms.lab-notes",
-            "cse.sem3",
+            "cse.core.dbms_lab_notes",
+            "cse.core",
             "mod@unishelf.edu",
             ["databases", "assignments"],
             "text/markdown",
@@ -320,16 +320,16 @@ def seed_resources(db: Session) -> None:
         (
             "Algorithms",
             "Algorithm design and analysis notes",
-            "cse.sem3.algorithms",
-            "cse.sem3",
+            "cse.core.algorithms",
+            "cse.core",
             "student1@unishelf.edu",
             ["algorithms", "data-structures"],
             "application/pdf",
         ),
         # Directory: math.calculus
         (
-            "Math Calculus",
-            "Calculus course materials",
+            "Math Calculus Collection",
+            "Calculus materials",
             "math.calculus",
             None,
             "admin@unishelf.edu",
@@ -358,7 +358,7 @@ def seed_resources(db: Session) -> None:
         (
             "Computer Networks Guide",
             "Complete networking reference guide",
-            "computer-networks.guide",
+            "computer_networks.guide",
             None,
             "mod@unishelf.edu",
             ["computer-networks", "notes"],
@@ -367,7 +367,7 @@ def seed_resources(db: Session) -> None:
         (
             "Linear Algebra Summary",
             "Key concepts and formulas",
-            "linear-algebra.summary",
+            "linear_algebra.summary",
             None,
             "student1@unishelf.edu",
             ["linear-algebra", "notes"],
@@ -376,7 +376,7 @@ def seed_resources(db: Session) -> None:
         (
             "Digital Logic Lab",
             "Lab experiments and results",
-            "digital-logic.lab",
+            "digital_logic.lab",
             None,
             "admin@unishelf.edu",
             ["digital-logic", "assignments"],
@@ -405,8 +405,8 @@ def seed_resources(db: Session) -> None:
         (
             "Operating Systems Notes",
             "Process scheduling and memory management",
-            "cse.sem3.os-notes",
-            "cse.sem3",
+            "cse.core.os_notes",
+            "cse.core",
             "student1@unishelf.edu",
             ["operating-systems", "notes"],
             "text/markdown",
@@ -414,7 +414,7 @@ def seed_resources(db: Session) -> None:
         (
             "Web Dev Project",
             "Full-stack web application code notes",
-            "web-dev.project",
+            "web_dev.project",
             None,
             "admin@unishelf.edu",
             ["web-dev", "oop"],
@@ -423,7 +423,7 @@ def seed_resources(db: Session) -> None:
         (
             "Compiler Design Basics",
             "Lexical analysis and parsing intro",
-            "compiler-design.basics",
+            "compiler_design.basics",
             None,
             "mod@unishelf.edu",
             ["compiler-design", "algorithms"],
@@ -450,7 +450,7 @@ def seed_resources(db: Session) -> None:
         (
             "Electronics Lab Manual",
             "Circuit experiments guide",
-            "electronics.lab-manual",
+            "electronics.lab_manual",
             None,
             "student1@unishelf.edu",
             ["electronics", "assignments"],

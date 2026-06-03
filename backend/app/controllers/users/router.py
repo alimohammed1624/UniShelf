@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import User, Tag
 from app.models.enums import UserRole
+from app.models.resource import Resource
 from app.database import get_db
 from app.controllers.auth.schemas import UserSchema, UserUpdate, UserPublicProfile
 from app.controllers.auth.helpers import get_current_user, get_password_hash, require_role
@@ -39,6 +40,45 @@ def update_my_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+
+# ── Bookmarks ───────────────────────────────────────────────
+
+@router.get("/me/bookmarks", response_model=List[int])
+def get_my_bookmarks(current_user: User = Depends(get_current_user)):
+    """Returns a list of resource IDs bookmarked by the user."""
+    return [r.id for r in current_user.bookmarked_resources]
+
+@router.post("/me/bookmarks/{resource_id}")
+def add_bookmark(
+    resource_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
+
+    if resource not in current_user.bookmarked_resources:
+        current_user.bookmarked_resources.append(resource)
+        db.commit()
+    return {"message": "Bookmark added"}
+
+@router.delete("/me/bookmarks/{resource_id}")
+def remove_bookmark(
+    resource_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
+
+    if resource in current_user.bookmarked_resources:
+        current_user.bookmarked_resources.remove(resource)
+        db.commit()
+    return {"message": "Bookmark removed"}
 
 
 # ── Interest tags ─────────────────────────────────────────────

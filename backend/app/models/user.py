@@ -21,3 +21,4 @@ class User(Base):
     owned_resources = relationship("Resource", back_populates="owner", foreign_keys="Resource.owner_id")
     interest_tags = relationship("Tag", secondary="user_tags", back_populates="interested_users")
     visibility_entries = relationship("Visibility", back_populates="user")
+    bookmarked_resources = relationship("Resource", secondary="user_bookmarks", backref="bookmarked_by_users")

@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect, KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
+import { AdvancedFilters, AdvancedFilterState } from '@/components/search/AdvancedFilters';
 import {
   fetchResources,
   downloadResource,
@@ -19,17 +17,22 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
-import { toggleBookmark } from '@/lib/features/bookmarks/bookmarksSlice';
+import { toggleBookmarkAsync } from '@/lib/features/bookmarks/bookmarksSlice';
 import { toast } from 'sonner';
 import { UserPublicProfile } from '@/types';
 import api from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function SearchPage() {
-  const [query, setQuery] = useState('');
-  const [tagInput, setTagInput] = useState('');
-  const [tagChips, setTagChips] = useState<string[]>([]);
-  const [userInput, setUserInput] = useState('');
-  const [userChips, setUserChips] = useState<string[]>([]);
+  // Advanced filter state
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>({
+    searchQuery: '',
+    resourceTypes: [],
+    dateRange: null,
+  });
+  
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [uploaders, setUploaders] = useState<UserPublicProfile[]>([]);
 
   const dispatch = useAppDispatch();
@@ -101,53 +104,51 @@ export default function SearchPage() {
       });
     });
   }, [resources, uploaders]);
-  const addTagChip = () => {
-    const val = tagInput.trim();
-    if (val && !tagChips.includes(val)) setTagChips((prev) => [...prev, val]);
-    setTagInput('');
-  };
 
-  const addUserChip = () => {
-    const val = userInput.trim();
-    if (val && !userChips.includes(val)) setUserChips((prev) => [...prev, val]);
-    setUserInput('');
-  };
-
-  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagChip(); }
-    else if (e.key === 'Backspace' && !tagInput) setTagChips((prev) => prev.slice(0, -1));
-  };
-
-  const handleUserKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addUserChip(); }
-    else if (e.key === 'Backspace' && !userInput) setUserChips((prev) => prev.slice(0, -1));
-  };
-
+  // Filter resources based on advanced filters
   const filtered = resources.filter((r) => {
-    const q = query.trim().toLowerCase();
-    const matchesQuery =
-      !q ||
-      r.title.toLowerCase().includes(q) ||
-      r.description?.toLowerCase().includes(q);
+    // Search query filter
+    if (advancedFilters.searchQuery) {
+      const q = advancedFilters.searchQuery.toLowerCase();
+      const matchesSearch =
+        r.title.toLowerCase().includes(q) ||
+        r.description?.toLowerCase().includes(q) ||
+        r.filename?.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
 
-    const matchesTags =
-      tagChips.length === 0 ||
-      tagChips.every((chip) =>
-        r.tags.some((t) => t.name.toLowerCase().includes(chip.toLowerCase()))
+    // Resource type filter
+    if (advancedFilters.resourceTypes.length > 0) {
+      const matchesType = advancedFilters.resourceTypes.some((typeId) => {
+        if (typeId === 'pdf' && r.type === 'application/pdf') return true;
+        if (typeId === 'video' && r.type?.startsWith('video/')) return true;
+        if (typeId === 'image' && r.type?.startsWith('image/')) return true;
+        if (typeId === 'code' && r.type?.startsWith('text/')) return true;
+        if (typeId === 'link' && r.type === 'link') return true;
+        return false;
+      });
+      if (!matchesType) return false;
+    }
+
+    // Tags filter
+    if (selectedTags.length > 0) {
+      const matchesTags = selectedTags.every((tagName) =>
+        r.tags.some((t) => t.name.toLowerCase() === tagName.toLowerCase())
       );
+      if (!matchesTags) return false;
+    }
 
-    const matchesUser =
-      userChips.length === 0 ||
-      (() => {
-        if (r.is_anonymous) return false;
-        const uploader = uploaders.find((u) => u.id === r.uploader_id);
-        if (!uploader) return false;
-        return userChips.some((chip) =>
-          uploader.full_name.toLowerCase().includes(chip.toLowerCase())
-        );
-      })();
+    // Date range filter
+    if (advancedFilters.dateRange) {
+      const resourceDate = new Date(r.created_at).toISOString().split('T')[0];
+      const fromDate = advancedFilters.dateRange.from;
+      const toDate = advancedFilters.dateRange.to;
+      
+      if (fromDate && resourceDate < fromDate) return false;
+      if (toDate && resourceDate > toDate) return false;
+    }
 
-    return matchesQuery && matchesTags && matchesUser;
+    return true;
   });
 
   const handleDownload = async (id: number, title: string) => {
@@ -208,7 +209,7 @@ export default function SearchPage() {
 
   const handleToggleBookmark = (resourceId: number, resourceTitle: string) => {
     const isBookmarked = bookmarkedResourceIds.includes(resourceId);
-    dispatch(toggleBookmark(resourceId));
+    dispatch(toggleBookmarkAsync(resourceId));
     toast.success(
       isBookmarked
         ? `Removed "${resourceTitle}" from bookmarks`
@@ -216,89 +217,112 @@ export default function SearchPage() {
     );
   };
 
+  const handleClearAllFilters = () => {
+    setAdvancedFilters({
+      searchQuery: '',
+      resourceTypes: [],
+      dateRange: null,
+    });
+    setSelectedTags([]);
+  };
+
+  const handleTagToggle = (tagName: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagName)
+        ? prev.filter((t) => t !== tagName)
+        : [...prev, tagName]
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Search</h1>
-
-      <Input
-        type="text"
-        placeholder="Search resources by title or description..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        autoFocus
-      />
-
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Filter by tag</p>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 min-h-10 focus-within:ring-1 focus-within:ring-ring">
-          {tagChips.map((chip) => (
-            <Badge key={chip} variant="secondary" className="gap-1 pr-1">
-              {chip}
-              <button
-                type="button"
-                aria-label={`Remove tag ${chip}`}
-                onClick={() => setTagChips((prev) => prev.filter((c) => c !== chip))}
-                className="rounded-full hover:bg-muted"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          <input
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-[140px]"
-            placeholder={tagChips.length === 0 ? 'Type a tag and press Enter...' : 'Add another...'}
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={handleTagKeyDown}
-            onBlur={addTagChip}
-          />
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Search Resources</h1>
+        <p className="text-muted-foreground">
+          Find academic materials with advanced filtering and search
+        </p>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Filter by uploader</p>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 min-h-10 focus-within:ring-1 focus-within:ring-ring">
-          {userChips.map((chip) => (
-            <Badge key={chip} variant="secondary" className="gap-1 pr-1">
-              {chip}
-              <button
-                type="button"
-                aria-label={`Remove uploader ${chip}`}
-                onClick={() => setUserChips((prev) => prev.filter((c) => c !== chip))}
-                className="rounded-full hover:bg-muted"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          <input
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-[140px]"
-            placeholder={userChips.length === 0 ? 'Type a name and press Enter...' : 'Add another...'}
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={handleUserKeyDown}
-            onBlur={addUserChip}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Sidebar Filters */}
+        <div className="lg:col-span-1">
+          <AdvancedFilters
+            filters={advancedFilters}
+            onFilterChange={setAdvancedFilters}
+            onClearAll={handleClearAllFilters}
+            allTags={allTags}
+            selectedTags={selectedTags}
+            onTagToggle={handleTagToggle}
           />
         </div>
-      </div>
 
-      <ResourceTableCard
-        resources={filtered}
-        loading={loading}
-        currentUserId={user?.id ?? null}
-        currentUserRole={user?.role ?? 0}
-        allTags={allTags}
-        showBookmarkAction
-        bookmarkedResourceIds={bookmarkedResourceIds}
-        onToggleBookmark={handleToggleBookmark}
-        onDownload={handleDownload}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onChangeFile={handleChangeFile}
-        onCreateTag={handleCreateTag}
-        onAssignTags={handleAssignTags}
-        onRemoveTag={handleRemoveTag}
-      />
+        {/* Main Content */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Search Input */}
+          <Input
+            type="text"
+            placeholder="Search by title, description, or filename..."
+            value={advancedFilters.searchQuery}
+            onChange={(e) =>
+              setAdvancedFilters({ ...advancedFilters, searchQuery: e.target.value })
+            }
+            className="text-base"
+            autoFocus
+          />
+
+          {/* Results Info */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {filtered.length === 0
+                ? 'No resources found'
+                : `${filtered.length} resource${filtered.length !== 1 ? 's' : ''} found`}
+            </p>
+            {(advancedFilters.searchQuery ||
+              advancedFilters.resourceTypes.length > 0 ||
+              selectedTags.length > 0 ||
+              advancedFilters.dateRange) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearAllFilters}
+                className="text-xs"
+              >
+                Reset filters
+              </Button>
+            )}
+          </div>
+
+          {/* Resources List */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">No resources match your filters</p>
+              <Button
+                variant="outline"
+                onClick={handleClearAllFilters}
+              >
+                Clear all filters
+              </Button>
+            </div>
+          ) : (
+            <ResourceTableCard
+              resources={filtered}
+              loading={loading}
+              currentUserId={user?.id ?? null}
+              currentUserRole={user?.role ?? 0}
+              allTags={allTags}
+              onDownload={handleDownload}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onChangeFile={handleChangeFile}
+              onCreateTag={handleCreateTag}
+              onAssignTags={handleAssignTags}
+              onRemoveTag={handleRemoveTag}
+              bookmarkedResourceIds={bookmarkedResourceIds}
+              onToggleBookmark={handleToggleBookmark}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

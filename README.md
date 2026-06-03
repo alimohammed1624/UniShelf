@@ -55,7 +55,7 @@ docker compose exec backend python seed_db.py --reset
 | student1@unishelf.edu | Student123! | Student |
 | student2@unishelf.edu | Student123! | Student |
 
-The script creates 4 users, 18 tags across CS/Math/Engineering categories, and ~20 resources organized in a hierarchy (e.g., `cse.sem1`, `cse.sem3`, `math.calculus`) with sample file content uploaded to MinIO.
+The script creates 4 users, 18 tags across free-form categories, and ~20 resources organized in a logical folder hierarchy (for example `cse.intro`, `cse.core`, and `math.calculus`) with sample file content uploaded to MinIO.
 
 ## Local Development
 
@@ -74,8 +74,8 @@ bun run dev                       # → http://localhost:3000
 ## Features
 
 - Upload and share PDFs, images, and documents via MinIO object storage
-- Organize resources with hierarchical parent-child relationships
-- Tag resources for easy discovery; manage system-wide tags
+- Organize resources with logical parent-child hierarchy
+- Tag resources for discovery; manage system-wide tags with free-form categories
 - Public/private resource visibility with per-user access control (whitelist/blacklist)
 - Anonymous uploads support
 - User management: role changes, ban/unban (admin)
