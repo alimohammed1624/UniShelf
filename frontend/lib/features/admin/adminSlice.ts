@@ -2,27 +2,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { extractErrorMessage } from '@/lib/apiUtils';
+import type { User, Resource } from '@/types';
 
 interface AdminState {
-  users: Array<{
-    id: number;
-    email: string;
-    full_name: string | null;
-    role: number;
-    is_active: boolean;
-    created_at: string;
-  }>;
-  resources: Array<{
-    id: number;
-    title: string;
-    filename: string | null;
-    uploader_id: number;
-    owner_id: number;
-    is_public: boolean;
-    is_archived: boolean;
-    created_at: string;
-    tags: Array<{ id: number; name: string }>;
-  }>;
+  users: User[];
+  resources: Resource[];
   usersLoading: boolean;
   resourcesLoading: boolean;
   usersError: string | null;
@@ -38,35 +22,37 @@ const initialState: AdminState = {
   resourcesError: null,
 };
 
-export const fetchUsers = createAsyncThunk<
-  Array<{ id: number; email: string; full_name: string | null; role: number; is_active: boolean; created_at: string }>,
-  void,
-  { rejectValue: string }
->('admin/fetchUsers', async (_, { rejectWithValue }) => {
-  try {
-    const response = await api.get<Array<{ id: number; email: string; full_name: string | null; role: number; is_active: boolean; created_at: string }>>('/admin/users');
-    return response.data;
-  } catch (err) {
-    const error = err as AxiosError<{ detail: unknown }>;
-    return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch users'));
-  }
-});
+export const fetchUsers = createAsyncThunk<User[], void, { rejectValue: string }>(
+  'admin/fetchUsers',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get<User[]>('/admin/users');
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch users'));
+    }
+  },
+);
 
 export const fetchResources = createAsyncThunk<
-  Array<{ id: number; title: string; filename: string | null; uploader_id: number; owner_id: number; is_public: boolean; is_archived: boolean; created_at: string; tags: Array<{ id: number; name: string }> }>,
+  Resource[],
   { includeArchived?: boolean },
   { rejectValue: string }
->('admin/fetchResources', async ({ includeArchived = false } = {}, { rejectWithValue }) => {
-  try {
-    const response = await api.get<Array<{ id: number; title: string; filename: string | null; uploader_id: number; owner_id: number; is_public: boolean; is_archived: boolean; created_at: string; tags: Array<{ id: number; name: string }> }>>('/admin/resources', {
-      params: { include_archived: includeArchived },
-    });
-    return response.data;
-  } catch (err) {
-    const error = err as AxiosError<{ detail: unknown }>;
-    return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch resources'));
-  }
-});
+>(
+  'admin/fetchResources',
+  async ({ includeArchived = false } = {}, { rejectWithValue }) => {
+    try {
+      const response = await api.get<Resource[]>('/admin/resources', {
+        params: { include_archived: includeArchived },
+      });
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch resources'));
+    }
+  },
+);
 
 export const deleteResource = createAsyncThunk<
   number, // resource id that was deleted

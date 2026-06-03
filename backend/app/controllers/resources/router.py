@@ -214,10 +214,8 @@ def list_resources(
 
     if hierarchy:
         validated_h = validate_hierarchy(hierarchy)
-        # Prefix match: "cse.sem3" matches "cse.sem3", "cse.sem3.dbms", etc.
-        query = query.filter(
-            (Resource.hierarchy == validated_h) | Resource.hierarchy.like(f"{validated_h}.%")
-        )
+        # ltree <@ operator: matches exact path and all descendants
+        query = query.filter(Resource.hierarchy.op('<@')(validated_h))
 
     if uploader_id:
         query = query.filter(Resource.uploader_id == uploader_id)
@@ -619,7 +617,7 @@ def _build_children_tree(
         .options(selectinload(Resource.tags))
         .filter(
             Resource.parent_id == parent_id,
-            Resource.hierarchy.like(f"{hierarchy_prefix}.%"),
+            Resource.hierarchy.op('<@')(hierarchy_prefix),
         )
     )
 
@@ -789,4 +787,3 @@ def report_resource(
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {resource_id}")
     return new_report
-

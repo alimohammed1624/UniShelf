@@ -29,7 +29,6 @@ export default function SearchPage() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>({
     searchQuery: '',
     resourceTypes: [],
-    hierarchy: '',
     dateRange: null,
   });
   
@@ -139,14 +138,6 @@ export default function SearchPage() {
       if (!matchesTags) return false;
     }
 
-    // Course/semester hierarchy filter
-    if (advancedFilters.hierarchy) {
-      const hierarchy = r.hierarchy?.toLowerCase() ?? '';
-      if (!hierarchy.includes(advancedFilters.hierarchy.toLowerCase())) {
-        return false;
-      }
-    }
-
     // Date range filter
     if (advancedFilters.dateRange) {
       const resourceDate = new Date(r.created_at).toISOString().split('T')[0];
@@ -230,7 +221,6 @@ export default function SearchPage() {
     setAdvancedFilters({
       searchQuery: '',
       resourceTypes: [],
-      hierarchy: '',
       dateRange: null,
     });
     setSelectedTags([]);
@@ -289,7 +279,6 @@ export default function SearchPage() {
             </p>
             {(advancedFilters.searchQuery ||
               advancedFilters.resourceTypes.length > 0 ||
-              advancedFilters.hierarchy ||
               selectedTags.length > 0 ||
               advancedFilters.dateRange) && (
               <Button

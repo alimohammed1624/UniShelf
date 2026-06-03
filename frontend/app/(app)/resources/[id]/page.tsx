@@ -707,15 +707,6 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
 
-            {/* Download button */}
-            {resource.type !== 'directory' && (
-              <Button asChild className="w-full" size="lg">
-                <a href={downloadUrl} download>
-                  Download
-                </a>
-              </Button>
-            )}
-
             {/* Report button - only visible when user is not the owner */}
             {user && resource.owner_id !== user.id && (
               <Button variant="outline" className="w-full" onClick={() => setReporting(true)}>
