@@ -30,6 +30,7 @@ import {
   editResource,
   deleteResource,
   changeResourceFile,
+  downloadResource,
 } from '@/lib/features/resources/resourceSlice';
 import {
   createTag,
@@ -285,12 +286,18 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     );
   };
 
+  const handleDownload = () => {
+    if (!resource) return;
+    const promise = dispatch(downloadResource({ id: resource.id, title: resource.title })).unwrap();
+    toast.promise(promise, { loading: 'Downloading...', success: 'Download started', error: 'Download failed' });
+    promise.catch(() => {});
+  };
+
   // ── Preview helpers ──────────────────────────────────────
 
   const apiDownloadPath = resource ? `/resources/${resource.id}/download` : '';
   const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
   const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
-  const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
   const pdfPreviewUrl = pdfBlobUrl ? `${pdfBlobUrl}#toolbar=0&page=${pdfPage}&zoom=${pdfZoom}` : '';
   const pdfFrameKey = pdfBlobUrl ? `${pdfBlobUrl}-${pdfPage}-${pdfZoom}` : 'pdf-empty';
   const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
@@ -569,9 +576,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                     <div className="space-y-2 rounded-md border bg-muted/40 p-4 text-sm">
                       <p className="text-muted-foreground">Preview is unavailable in this browser.</p>
                       <div className="flex flex-wrap gap-2">
-                        <Button asChild size="sm">
-                          <a href={downloadUrl} download>Download PDF</a>
-                        </Button>
+                        <Button size="sm" onClick={handleDownload}>Download PDF</Button>
                         <Button asChild size="sm" variant="outline">
                           <a href={pdfBlobUrl ?? downloadUrl} target="_blank" rel="noreferrer">Open in new tab</a>
                         </Button>
@@ -715,10 +720,8 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             )}
             <div className="flex gap-2">
               {resource.type !== 'directory' && (
-                <Button asChild className="flex-1" size="lg">
-                  <a href={downloadUrl} download>
-                    Download
-                  </a>
+                <Button className="flex-1" size="lg" onClick={handleDownload}>
+                  Download
                 </Button>
               )}
               <Button
