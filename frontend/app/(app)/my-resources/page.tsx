@@ -153,6 +153,7 @@ export default function MyResourcesPage() {
         onCreateTag={handleCreateTag}
         onAssignTags={handleAssignTags}
         onRemoveTag={handleRemoveTag}
+        storageKey="viewMode:my-resources"
       />
     </div>
   );

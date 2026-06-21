@@ -44,6 +44,7 @@ interface ResourceTableCardProps {
   onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
   bookmarkedResourceIds?: number[];
   onToggleBookmark?: (id: number, title: string) => void;
+  storageKey?: string;
 }
 
 export function ResourceTableCard({
@@ -61,6 +62,7 @@ export function ResourceTableCard({
   onRemoveTag,
   bookmarkedResourceIds = [],
   onToggleBookmark,
+  storageKey = 'viewMode:default',
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -82,8 +84,16 @@ export function ResourceTableCard({
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
 
-  // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  // View mode state — persisted per page via localStorage
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    return (localStorage.getItem(storageKey) as 'list' | 'grid') ?? 'list';
+  });
+
+  const setAndPersistViewMode = (mode: 'list' | 'grid') => {
+    localStorage.setItem(storageKey, mode);
+    setViewMode(mode);
+  };
 
   // Thumbnail state
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -249,7 +259,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => setAndPersistViewMode('list')}
                 aria-label="List view"
               >
                 <List className="h-4 w-4" />
@@ -257,7 +267,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('grid')}
+                onClick={() => setAndPersistViewMode('grid')}
                 aria-label="Grid view"
               >
                 <Grid3x3 className="h-4 w-4" />

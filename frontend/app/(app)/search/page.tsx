@@ -319,6 +319,7 @@ export default function SearchPage() {
               onRemoveTag={handleRemoveTag}
               bookmarkedResourceIds={bookmarkedResourceIds}
               onToggleBookmark={handleToggleBookmark}
+              storageKey="viewMode:search"
             />
           )}
         </div>
