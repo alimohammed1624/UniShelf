@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
@@ -79,7 +79,13 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfPageTransition, setPdfPageTransition] = useState(false);
+  const [pdfRendering, setPdfRendering] = useState(false);
+  // Refs for pdfjs canvas rendering — keeps doc cached so page switches are instant
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfDocRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderTaskRef = useRef<any>(null);
   const [imageZoom, setImageZoom] = useState(100);
   const [imageFullscreen, setImageFullscreen] = useState(false);
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
@@ -145,7 +151,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     setPdfFullscreen(false);
     setPdfPreviewFailed(false);
     setPdfBlobUrl(null);
-    setPdfPageTransition(false);
+    pdfDocRef.current = null;
     setImageZoom(100);
     setImageFullscreen(false);
     setImageBlobUrl(null);
@@ -291,8 +297,6 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
   const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
   const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
-  const pdfPreviewUrl = pdfBlobUrl ? `${pdfBlobUrl}#toolbar=0&page=${pdfPage}&zoom=${pdfZoom}` : '';
-  const pdfFrameKey = pdfBlobUrl ? `${pdfBlobUrl}-${pdfPage}-${pdfZoom}` : 'pdf-empty';
   const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
 
   const isPdf = resource?.type === 'application/pdf';
@@ -300,7 +304,8 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
   const isText = resource?.type?.startsWith('text/');
   const canPreview = isPdf || isImage || isText;
   const isFirstPdfPage = pdfPage <= 1;
-  const isLastPdfPage = !!pdfNumPages && pdfPage >= pdfNumPages;
+  // Disable Next while page count is unknown (loading) OR when on the last page
+  const isLastPdfPage = !pdfNumPages || pdfPage >= pdfNumPages;
 
   useEffect(() => {
     if (!isPdf || !apiInlinePath) {
@@ -412,38 +417,86 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
     };
   }, [apiDownloadPath, apiInlinePath, isImage]);
 
+  // ── Load pdfjs document (once per blob URL) ──────────────
   useEffect(() => {
     if (!pdfBlobUrl || !isPdf) {
       setPdfNumPages(null);
+      pdfDocRef.current = null;
       return;
     }
 
     let cancelled = false;
-    const loadPdfMeta = async () => {
+
+    const loadDoc = async () => {
       try {
-        const pdfjs = await import('pdfjs-dist/legacy/build/pdf');
-        const { GlobalWorkerOptions, getDocument } = pdfjs;
-        GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
-          import.meta.url
-        ).toString();
+        const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+        GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         const res = await fetch(pdfBlobUrl);
         const data = await res.arrayBuffer();
-        const pdf = await getDocument({ data }).promise;
+        const doc = await getDocument({ data }).promise;
         if (cancelled) return;
-        setPdfNumPages(pdf.numPages);
-        setPdfPage((prev) => Math.min(prev, pdf.numPages));
+        pdfDocRef.current = doc;
+        setPdfNumPages(doc.numPages);
+        // Clamp current page to valid range
+        setPdfPage((prev) => Math.min(prev, doc.numPages));
       } catch {
-        if (!cancelled) setPdfNumPages(null);
+        if (!cancelled) {
+          setPdfNumPages(null);
+          pdfDocRef.current = null;
+        }
       }
     };
 
-    loadPdfMeta();
+    loadDoc();
 
     return () => {
       cancelled = true;
     };
   }, [isPdf, pdfBlobUrl]);
+
+  // ── Render current page to canvas whenever page/zoom changes ─
+  useEffect(() => {
+    if (!pdfDocRef.current || !canvasRef.current) return;
+
+    let cancelled = false;
+
+    const renderPage = async () => {
+      // Cancel any in-progress render task first
+      if (renderTaskRef.current) {
+        try { renderTaskRef.current.cancel(); } catch { /* ignore */ }
+        renderTaskRef.current = null;
+      }
+
+      setPdfRendering(true);
+      try {
+        const page = await pdfDocRef.current.getPage(pdfPage);
+        if (cancelled) return;
+
+        const scale = pdfZoom / 100;
+        const viewport = page.getViewport({ scale });
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext('2d')!;
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const task = page.render({ canvasContext: ctx, viewport });
+        renderTaskRef.current = task;
+        await task.promise;
+        if (!cancelled) renderTaskRef.current = null;
+      } catch {
+        // RenderingCancelled is normal when switching pages quickly — ignore
+      } finally {
+        if (!cancelled) setPdfRendering(false);
+      }
+    };
+
+    renderPage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfPage, pdfZoom, pdfNumPages]);
 
   // ── Loading state ────────────────────────────────────────
 
@@ -493,21 +546,22 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                         variant="outline"
                         onClick={() => {
                           if (isFirstPdfPage) return;
-                          setPdfPageTransition(true);
                           setPdfPage((p) => Math.max(1, p - 1));
                         }}
                         disabled={isFirstPdfPage}
                       >
                         Prev
                       </Button>
+                      <span className="min-w-16 text-center text-sm text-muted-foreground">
+                        {pdfNumPages ? `${pdfPage} / ${pdfNumPages}` : `Page ${pdfPage}`}
+                      </span>
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => {
                           if (isLastPdfPage) return;
-                          setPdfPageTransition(true);
-                          setPdfPage((p) => (pdfNumPages ? Math.min(pdfNumPages, p + 1) : p + 1));
+                          setPdfPage((p) => pdfNumPages ? Math.min(pdfNumPages, p + 1) : p);
                         }}
                         disabled={isLastPdfPage}
                       >
@@ -551,21 +605,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
 
                   {pdfLoading ? (
                     <div className="p-4 text-sm text-muted-foreground">Loading PDF preview...</div>
-                  ) : !pdfPreviewFailed && pdfBlobUrl ? (
-                    <div className={`${isPreviewFullscreen ? 'h-[75vh]' : 'h-[60vh]'} w-full overflow-hidden rounded-md border bg-muted/10`}>
-                      <iframe
-                        key={pdfFrameKey}
-                        src={pdfPreviewUrl}
-                        onLoad={() => {
-                          if (pdfPageTransition) {
-                            setPdfPageTransition(false);
-                          }
-                        }}
-                        className="h-full w-full border-0"
-                        title={`Preview of ${resource.title}`}
-                      />
-                    </div>
-                  ) : (
+                  ) : pdfPreviewFailed ? (
                     <div className="space-y-2 rounded-md border bg-muted/40 p-4 text-sm">
                       <p className="text-muted-foreground">Preview is unavailable in this browser.</p>
                       <div className="flex flex-wrap gap-2">
@@ -573,11 +613,26 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
                           <a href={downloadUrl} download>Download PDF</a>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                          <a href={pdfBlobUrl ?? downloadUrl} target="_blank" rel="noreferrer">Open in new tab</a>
+                          <a href={downloadUrl} target="_blank" rel="noreferrer">Open in new tab</a>
                         </Button>
                       </div>
                     </div>
-                  )}
+                  ) : pdfBlobUrl ? (
+                    <div
+                      className={`${
+                        isPreviewFullscreen ? 'h-[75vh]' : 'h-[60vh]'
+                      } relative w-full overflow-auto rounded-md border bg-muted/10`}
+                    >
+                      {pdfRendering && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 text-sm text-muted-foreground">
+                          Rendering...
+                        </div>
+                      )}
+                      <div className="flex min-h-full items-start justify-center p-4">
+                        <canvas ref={canvasRef} className="shadow-md" />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
               {isImage && (
