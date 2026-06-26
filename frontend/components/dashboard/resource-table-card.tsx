@@ -44,6 +44,7 @@ interface ResourceTableCardProps {
   onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
   bookmarkedResourceIds?: number[];
   onToggleBookmark?: (id: number, title: string) => void;
+  hideActions?: boolean;
 }
 
 export function ResourceTableCard({
@@ -61,6 +62,7 @@ export function ResourceTableCard({
   onRemoveTag,
   bookmarkedResourceIds = [],
   onToggleBookmark,
+  hideActions = false,
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -210,25 +212,29 @@ export function ResourceTableCard({
           )}
         </Button>
       )}
-      {resource.type !== 'directory' && (
-        <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-          Download
-        </Button>
-      )}
-      {isOwnerOrAdmin(resource) && (
+      {!hideActions && (
         <>
-          <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-            Change
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-            Tags
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-            Delete
-          </Button>
+          {resource.type !== 'directory' && (
+            <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+              Download
+            </Button>
+          )}
+          {isOwnerOrAdmin(resource) && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+                Edit
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+                Change
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+                Tags
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+                Delete
+              </Button>
+            </>
+          )}
         </>
       )}
     </>
@@ -278,7 +284,7 @@ export function ResourceTableCard({
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {(!hideActions || onToggleBookmark) && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -300,11 +306,13 @@ export function ResourceTableCard({
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell>User #{resource.uploader_id}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {renderActions(resource)}
-                      </div>
-                    </TableCell>
+                    {(!hideActions || onToggleBookmark) && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {renderActions(resource)}
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -335,9 +343,11 @@ export function ResourceTableCard({
                   <div className="text-xs text-muted-foreground mb-3">
                     {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {renderActions(resource)}
-                  </div>
+                  {(!hideActions || onToggleBookmark) && (
+                    <div className="flex flex-wrap gap-1">
+                      {renderActions(resource)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

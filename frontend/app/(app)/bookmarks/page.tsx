@@ -107,6 +107,7 @@ export default function BookmarksPage() {
           onCreateTag={handleCreateTag}
           onAssignTags={handleAssignTags}
           onRemoveTag={handleRemoveTag}
+          hideActions
         />
       )}
     </div>
