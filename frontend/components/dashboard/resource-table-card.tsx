@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserLabel } from '@/components/ui/user-label';
 import {
   Table,
   TableBody,
@@ -305,7 +306,7 @@ export function ResourceTableCard({
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
-                    <TableCell>User #{resource.uploader_id}</TableCell>
+                    <TableCell><UserLabel userId={resource.uploader_id} /></TableCell>
                     {(!hideActions || onToggleBookmark) && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -341,7 +342,7 @@ export function ResourceTableCard({
                     ))}
                   </div>
                   <div className="text-xs text-muted-foreground mb-3">
-                    {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
+                    {resource.is_public ? 'Public' : 'Private'} • <UserLabel userId={resource.uploader_id} />
                   </div>
                   {(!hideActions || onToggleBookmark) && (
                     <div className="flex flex-wrap gap-1">
@@ -368,7 +369,7 @@ export function ResourceTableCard({
               <div className="my-4 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground space-y-1">
                 <p><span className="font-medium text-foreground">ID:</span> {editingResource.id}</p>
                 <p><span className="font-medium text-foreground">File:</span> {editingResource.file_path}</p>
-                <p><span className="font-medium text-foreground">Uploader:</span> User #{editingResource.uploader_id}</p>
+                <p><span className="font-medium text-foreground">Uploader:</span> <UserLabel userId={editingResource.uploader_id} /></p>
                 <p><span className="font-medium text-foreground">Created:</span> {new Date(editingResource.created_at).toLocaleString()}</p>
               </div>
             )}

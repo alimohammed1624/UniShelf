@@ -10,6 +10,7 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserLabel } from '@/components/ui/user-label';
 import { Dirtree } from '@/components/dirtree/Dirtree';
 import { useResourceTree } from '@/hooks/useResourceTree';
 import {
@@ -742,7 +743,7 @@ export default function ResourceDetailPage({ params }: { params: Promise<{ id: s
             <div className="space-y-2 text-sm">
               <div>
                 <span className="font-medium">Uploader:</span>{' '}
-                <span className="text-muted-foreground">User #{resource.uploader_id}</span>
+                <UserLabel userId={resource.uploader_id} className="text-muted-foreground" />
               </div>
               <div>
                 <span className="font-medium">Visibility:</span>{' '}

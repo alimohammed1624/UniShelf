@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchUsers, fetchResources, deleteResource } from '@/lib/features/admin/adminSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserLabel } from '@/components/ui/user-label';
 import { toast } from 'sonner';
 
 function getRoleLabel(role: number): string {
@@ -113,9 +114,13 @@ function ResourcesPanel() {
   const loading = useAppSelector((state) => state.admin.resourcesLoading);
   const error = useAppSelector((state) => state.admin.resourcesError);
   const userRole = useAppSelector((state) => state.auth.user?.role ?? -1);
+  const users = useAppSelector((state) => state.admin.users);
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  // Build a quick lookup: userId → { full_name, email }
+  const userMap = new Map(users.map((u) => [u.id, { full_name: u.full_name, email: u.email }]));
 
   const filteredResources = resources.filter((r) => {
     if (filter === 'active') return !r.is_archived;
@@ -226,7 +231,12 @@ function ResourcesPanel() {
             <tr key={resource.id} className="border-b last:border-b-0 hover:bg-muted/50">
               <td className="py-2 pr-4 font-medium">{resource.title}</td>
               <td className="py-2 pr-4 text-muted-foreground truncate max-w-[150px]">{resource.filename || '—'}</td>
-              <td className="py-2 pr-4 text-muted-foreground">User #{resource.owner_id}</td>
+              <td className="py-2 pr-4 text-muted-foreground">
+                <UserLabel
+                  userId={resource.owner_id}
+                  preloaded={userMap.get(resource.owner_id)}
+                />
+              </td>
               <td className="py-2 pr-4">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${resource.is_public ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
                   {getVisibilityBadge(resource.is_public)}
