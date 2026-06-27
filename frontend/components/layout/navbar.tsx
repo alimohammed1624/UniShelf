@@ -34,17 +34,17 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b border-[oklch(0.68_0.24_280/18%)] bg-background/80 backdrop-blur-md shadow-[0_1px_0_oklch(0.68_0.24_280/12%)]">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <span className="text-lg font-semibold">UniShelf</span>
+        <span className="brand-logo text-lg font-bold tracking-tight">UniShelf</span>
         <nav className="flex items-center gap-1">
           {NAV_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
-                pathname === href ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
+                pathname === href ? 'nav-link-active' : 'text-muted-foreground'
               )}
             >
               <Icon size={15} />
@@ -59,8 +59,8 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
-                  pathname === href ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
+                  pathname === href ? 'nav-link-active' : 'text-muted-foreground'
                 )}
               >
                 <Icon size={15} />

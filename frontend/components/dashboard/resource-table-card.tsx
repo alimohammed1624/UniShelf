@@ -320,7 +320,7 @@ export function ResourceTableCard({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {resources.map((resource) => (
-                <div key={resource.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div key={resource.id} className="border border-[oklch(0.68_0.24_280/15%)] rounded-lg p-4 hover:shadow-[0_4px_24px_oklch(0.68_0.24_280/20%)] hover:border-[oklch(0.68_0.24_280/35%)] transition-all duration-200 bg-card relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-[oklch(0.68_0.24_280/30%)] before:to-transparent">
                   <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-3">
                     {thumbnails[resource.id] ? (
                       <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover rounded-md" />

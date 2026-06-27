@@ -9,11 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 dark:shadow-[0_0_12px_oklch(0.68_0.24_280/35%)] dark:hover:shadow-[0_0_18px_oklch(0.68_0.24_280/50%)] dark:bg-gradient-to-br dark:from-[oklch(0.72_0.22_275)] dark:to-[oklch(0.60_0.26_288)]",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive/90 text-white shadow-sm hover:bg-destructive focus-visible:ring-destructive/30 dark:bg-[oklch(0.28_0.06_15)] dark:text-[oklch(0.85_0.12_15)] dark:border dark:border-[oklch(0.6_0.2_15/30%)] dark:hover:bg-[oklch(0.32_0.08_15)] dark:hover:border-[oklch(0.6_0.2_15/50%)] dark:focus-visible:ring-[oklch(0.6_0.2_15/30%)]",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-[oklch(0.68_0.24_280/25%)] dark:hover:bg-accent dark:hover:border-[oklch(0.68_0.24_280/40%)]",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
