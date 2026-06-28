@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchUsers, fetchResources, deleteResource } from '@/lib/features/admin/adminSlice';
@@ -8,6 +8,129 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserLabel } from '@/components/ui/user-label';
 import { toast } from 'sonner';
+
+/* ── Fully-themed custom select ─────────────────────────────────────── */
+function ThemeSelect<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          height: '2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          padding: '0 0.75rem',
+          borderRadius: '0.375rem',
+          border: `1px solid oklch(0.68 0.24 280 / ${open ? '80%' : '45%'})`,
+          background: 'oklch(0.155 0.026 272)',
+          color: 'oklch(0.82 0.12 280)',
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          boxShadow: open ? '0 0 0 2px oklch(0.68 0.24 280 / 25%)' : 'none',
+          transition: 'border-color 0.15s, box-shadow 0.15s',
+          outline: 'none',
+          minWidth: '6rem',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>{selected?.label}</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="currentColor"
+          style={{ opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+        >
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            minWidth: '100%',
+            zIndex: 50,
+            background: 'oklch(0.155 0.026 272)',
+            border: '1px solid oklch(0.68 0.24 280 / 40%)',
+            borderRadius: '0.375rem',
+            boxShadow: '0 8px 24px oklch(0 0 0 / 50%), 0 0 0 1px oklch(0.68 0.24 280 / 12%) inset',
+            overflow: 'hidden',
+          }}
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '0.4rem 0.75rem',
+                textAlign: 'left',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                border: 'none',
+                outline: 'none',
+                background: opt.value === value
+                  ? 'oklch(0.68 0.24 280 / 22%)'
+                  : 'transparent',
+                color: opt.value === value
+                  ? 'oklch(0.88 0.18 280)'
+                  : 'oklch(0.85 0.02 272)',
+                fontWeight: opt.value === value ? 500 : 400,
+                transition: 'background 0.1s, color 0.1s',
+              }}
+              onMouseEnter={(e) => {
+                if (opt.value !== value) {
+                  e.currentTarget.style.background = 'oklch(0.68 0.24 280 / 12%)';
+                  e.currentTarget.style.color = 'oklch(0.88 0.12 280)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (opt.value !== value) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'oklch(0.85 0.02 272)';
+                }
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function getRoleLabel(role: number): string {
   switch (role) {
@@ -168,25 +291,25 @@ function ResourcesPanel() {
         <h2 className="text-lg font-medium">Resources</h2>
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted-foreground whitespace-nowrap">Status:</label>
-          <select
+          <ThemeSelect<'all' | 'active' | 'archived'>
             value={filter}
-            onChange={(e) => setFilter(e.target.value as 'all' | 'active' | 'archived')}
-            className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm"
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-          </select>
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'active', label: 'Active' },
+              { value: 'archived', label: 'Archived' },
+            ]}
+          />
           <label className="text-sm text-muted-foreground whitespace-nowrap">Visibility:</label>
-          <select
+          <ThemeSelect<'all' | 'public' | 'private'>
             value={visibilityFilter}
-            onChange={(e) => setVisibilityFilter(e.target.value as 'all' | 'public' | 'private')}
-            className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm"
-          >
-            <option value="all">All</option>
-            <option value="public">Public</option>
-            <option value="private">Private</option>
-          </select>
+            onChange={setVisibilityFilter}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'public', label: 'Public' },
+              { value: 'private', label: 'Private' },
+            ]}
+          />
         </div>
       </div>
 
@@ -268,16 +391,20 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const userRole = useAppSelector((state) => state.auth.user?.role ?? -1);
 
-  // Redirect non-admin users
-  if (userRole < 2) {
-    router.push('/my-resources');
-    return null;
-  }
-
   useEffect(() => {
+    // Redirect non-admin users
+    if (userRole < 2) {
+      router.push('/my-resources');
+      return;
+    }
     dispatch(fetchUsers());
     dispatch(fetchResources({ includeArchived: true }));
-  }, [dispatch]);
+  }, [dispatch, router, userRole]);
+
+  // Don't render admin content for non-admin users
+  if (userRole < 2) {
+    return null;
+  }
 
   const renderPanel = () => {
     switch (activeSection) {
