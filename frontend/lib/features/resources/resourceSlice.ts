@@ -99,6 +99,24 @@ export const deleteResource = createAsyncThunk<number, number, { rejectValue: st
   }
 );
 
+export const submitLink = createAsyncThunk<Resource, { title: string; description: string; url: string; is_public: boolean }, { rejectValue: string }>(
+  'resources/submitLink',
+  async ({ title, description, url, is_public }, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('url', url);
+      formData.append('is_public', String(is_public));
+      const response = await api.post<Resource>('/resources/link', formData);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to submit link'));
+    }
+  }
+);
+
 export const changeResourceFile = createAsyncThunk<Resource, { id: number; formData: FormData }, { rejectValue: string }>(
   'resources/changeFile',
   async ({ id, formData }, { rejectWithValue }) => {
@@ -147,6 +165,19 @@ const resourceSlice = createSlice({
       .addCase(uploadResource.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Upload failed';
+      })
+      // Submit link
+      .addCase(submitLink.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(submitLink.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items.push(action.payload);
+      })
+      .addCase(submitLink.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to submit link';
       })
       // Edit
       .addCase(editResource.fulfilled, (state, action) => {

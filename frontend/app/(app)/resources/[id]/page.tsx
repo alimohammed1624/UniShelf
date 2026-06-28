@@ -743,7 +743,13 @@ export default function ResourceDetailPage({
                   Report Resource
                 </Button>
               )}
-              {resource.type !== "directory" && (
+              {resource.type === "link" ? (
+                <Button className="w-full" size="lg" asChild>
+                  <a href={resource.file_path ?? '#'} target="_blank" rel="noopener noreferrer">
+                    Open Link
+                  </a>
+                </Button>
+              ) : resource.type !== "directory" && (
                 <Button className="w-full" size="lg" onClick={handleDownload}>
                   Download
                 </Button>
@@ -759,12 +765,14 @@ export default function ResourceDetailPage({
           <Button variant="outline" onClick={() => openEditModal(resource)}>
             Edit
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setChangingResource(resource)}
-          >
-            Change File
-          </Button>
+          {resource.type !== "link" && (
+            <Button
+              variant="outline"
+              onClick={() => setChangingResource(resource)}
+            >
+              Change File
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => setTaggingResource(resource)}

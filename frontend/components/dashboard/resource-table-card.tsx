@@ -220,7 +220,13 @@ export function ResourceTableCard({
           )}
         </Button>
       )}
-      {resource.type !== 'directory' && (
+      {resource.type === 'link' ? (
+        <Button size="sm" asChild>
+          <a href={resource.file_path ?? '#'} target="_blank" rel="noopener noreferrer">
+            Open Link
+          </a>
+        </Button>
+      ) : resource.type !== 'directory' && (
         <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
           Download
         </Button>
@@ -230,9 +236,11 @@ export function ResourceTableCard({
           <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
             Edit
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-            Change
-          </Button>
+          {resource.type !== 'link' && (
+            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+              Change
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
             Tags
           </Button>
