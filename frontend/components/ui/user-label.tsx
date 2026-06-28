@@ -62,6 +62,7 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   );
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState<'above' | 'below'>('above');
+  const [tooltipCoords, setTooltipCoords] = useState<{ left: number; top: number } | null>(null);
   const wrapperRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -93,7 +94,12 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   const handleMouseEnter = () => {
     if (!tooltipContent || !wrapperRef.current) return;
     const rect = wrapperRef.current.getBoundingClientRect();
-    setTooltipPos(rect.top > 80 ? 'above' : 'below');
+    const above = rect.top > 80;
+    setTooltipPos(above ? 'above' : 'below');
+    setTooltipCoords({
+      left: rect.left,
+      top: above ? rect.top - 8 : rect.bottom + 8,
+    });
     setTooltipVisible(true);
   };
 
@@ -110,16 +116,15 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
         {displayName}
       </span>
 
-      {/* Custom tooltip — shown only when there's something extra to display */}
-      {tooltipContent && tooltipVisible && (
+      {/* Custom tooltip — fixed positioning escapes overflow-x-auto clipping */}
+      {tooltipContent && tooltipVisible && tooltipCoords && (
         <span
-          className={`
-            pointer-events-none absolute z-50 left-0
-            ${tooltipPos === 'above' ? 'bottom-full mb-2' : 'top-full mt-2'}
-            min-w-max rounded-md
-            bg-[oklch(0.20_0.04_280)] border border-[oklch(0.68_0.24_280/25%)]
-            px-3 py-2 shadow-lg shadow-[oklch(0.68_0.24_280/15%)]
-          `}
+          className="pointer-events-none fixed z-[9999] min-w-max rounded-md bg-[oklch(0.20_0.04_280)] border border-[oklch(0.68_0.24_280/25%)] px-3 py-2 shadow-lg shadow-[oklch(0.68_0.24_280/15%)]"
+          style={{
+            left: tooltipCoords.left,
+            top: tooltipCoords.top,
+            transform: tooltipPos === 'above' ? 'translateY(-100%)' : 'translateY(0)',
+          }}
         >
           <span className="text-xs text-[oklch(0.78_0.14_280)] whitespace-nowrap leading-tight">
             {tooltipContent}
