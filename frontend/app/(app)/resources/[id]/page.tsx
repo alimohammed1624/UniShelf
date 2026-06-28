@@ -635,8 +635,21 @@ export default function ResourceDetailPage({
         {/* ── Right column: Metadata ───────────────────────── */}
         {!imageFullscreen && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Details</CardTitle>
+              <Button
+                size="sm"
+                variant={isBookmarked ? "secondary" : "outline"}
+                onClick={handleToggleBookmark}
+                aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+              >
+                {isBookmarked ? (
+                  <BookmarkCheck className="h-5 w-5" />
+                ) : (
+                  <Bookmark className="h-5 w-5" />
+                )}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -730,26 +743,11 @@ export default function ResourceDetailPage({
                   Report Resource
                 </Button>
               )}
-              <div className="flex gap-2">
-                {resource.type !== "directory" && (
-                  <Button className="flex-1" size="lg" onClick={handleDownload}>
-                    Download
-                  </Button>
-                )}
-                <Button
-                  size="lg"
-                  variant={isBookmarked ? "secondary" : "outline"}
-                  onClick={handleToggleBookmark}
-                  aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-                  title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
-                >
-                  {isBookmarked ? (
-                    <BookmarkCheck className="h-5 w-5" />
-                  ) : (
-                    <Bookmark className="h-5 w-5" />
-                  )}
+              {resource.type !== "directory" && (
+                <Button className="w-full" size="lg" onClick={handleDownload}>
+                  Download
                 </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
         )}
