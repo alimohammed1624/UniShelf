@@ -299,7 +299,7 @@ export function ResourceTableCard({
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
-                  {(!hideActions || onToggleBookmark) && <TableHead className="text-right">Actions</TableHead>}
+                  {!hideActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,7 +321,7 @@ export function ResourceTableCard({
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell><UserLabel userId={resource.uploader_id} /></TableCell>
-                    {(!hideActions || onToggleBookmark) && (
+                    {!hideActions && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           {renderActions(resource)}
@@ -358,7 +358,7 @@ export function ResourceTableCard({
                   <div className="text-xs text-muted-foreground mb-3">
                     {resource.is_public ? 'Public' : 'Private'} • <UserLabel userId={resource.uploader_id} />
                   </div>
-                  {(!hideActions || onToggleBookmark) && (
+                  {!hideActions && (
                     <div className="flex flex-wrap gap-1">
                       {renderActions(resource)}
                     </div>
