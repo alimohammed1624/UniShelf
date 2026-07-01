@@ -390,16 +390,17 @@ export default function AdminPage() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const userRole = useAppSelector((state) => state.auth.user?.role ?? -1);
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
 
   useEffect(() => {
-    // Redirect non-admin users
+    if (!isAuthenticated) return;
     if (userRole < 2) {
       router.push('/my-resources');
       return;
     }
     dispatch(fetchUsers());
     dispatch(fetchResources({ includeArchived: true }));
-  }, [dispatch, router, userRole]);
+  }, [dispatch, router, userRole, isAuthenticated]);
 
   // Don't render admin content for non-admin users
   if (userRole < 2) {
