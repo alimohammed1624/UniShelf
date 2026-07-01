@@ -46,6 +46,7 @@ interface ResourceTableCardProps {
   bookmarkedResourceIds?: number[];
   onToggleBookmark?: (id: number, title: string) => void;
   hideActions?: boolean;
+  storageKey?: string;
 }
 
 export function ResourceTableCard({
@@ -64,6 +65,7 @@ export function ResourceTableCard({
   bookmarkedResourceIds = [],
   onToggleBookmark,
   hideActions = false,
+  storageKey = 'viewMode:default',
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -85,8 +87,16 @@ export function ResourceTableCard({
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
 
-  // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  // View mode state — persisted per page via localStorage
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    return (localStorage.getItem(storageKey) as 'list' | 'grid') ?? 'list';
+  });
+
+  const setAndPersistViewMode = (mode: 'list' | 'grid') => {
+    localStorage.setItem(storageKey, mode);
+    setViewMode(mode);
+  };
 
   // Thumbnail state
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -213,29 +223,33 @@ export function ResourceTableCard({
           )}
         </Button>
       )}
-      {!hideActions && (
+      {resource.type === 'link' ? (
+        <Button size="sm" asChild>
+          <a href={resource.file_path ?? '#'} target="_blank" rel="noopener noreferrer">
+            Open Link
+          </a>
+        </Button>
+      ) : resource.type !== 'directory' && (
+        <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
+          Download
+        </Button>
+      )}
+      {!hideActions && isOwnerOrAdmin(resource) && (
         <>
-          {resource.type !== 'directory' && (
-            <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
-              Download
+          <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
+            Edit
+          </Button>
+          {resource.type !== 'link' && (
+            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+              Change
             </Button>
           )}
-          {isOwnerOrAdmin(resource) && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
-                Edit
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-                Change
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
-                Tags
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
-                Delete
-              </Button>
-            </>
-          )}
+          <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
+            Tags
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setDeleteId(resource.id)}>
+            Delete
+          </Button>
         </>
       )}
     </>
@@ -256,7 +270,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => setAndPersistViewMode('list')}
                 aria-label="List view"
               >
                 <List className="h-4 w-4" />
@@ -264,7 +278,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('grid')}
+                onClick={() => setAndPersistViewMode('grid')}
                 aria-label="Grid view"
               >
                 <Grid3x3 className="h-4 w-4" />

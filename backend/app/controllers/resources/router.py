@@ -65,6 +65,46 @@ MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 # ── Upload ────────────────────────────────────────────────────
 
 
+@router.post("/link", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
+async def submit_link_resource(
+    title: str = Form(..., min_length=1, max_length=255),
+    description: str = Form("", max_length=2000),
+    url: str = Form(..., min_length=1, max_length=2048),
+    is_public: bool = Form(True),
+    is_anonymous: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="URL must start with http:// or https://")
+
+    db_resource = Resource(
+        title=title.strip(),
+        description=description,
+        file_path=url,
+        hierarchy="",
+        parent_id=None,
+        filename=None,
+        size=None,
+        type="link",
+        is_public=is_public,
+        is_anonymous=is_anonymous,
+        uploader_id=current_user.id,
+        owner_id=current_user.id,
+    )
+    db.add(db_resource)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save link resource")
+
+    db.refresh(db_resource)
+    UPLOAD_COUNT.labels(status="success").inc()
+    return db_resource
+
+
 @router.post("", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
 async def upload_resource(
     title: str = Form(..., min_length=1, max_length=255),

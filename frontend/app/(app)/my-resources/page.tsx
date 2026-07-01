@@ -7,6 +7,7 @@ import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import {
   fetchResources,
   uploadResource,
+  submitLink,
   downloadResource,
   editResource,
   deleteResource,
@@ -29,6 +30,7 @@ export default function MyResourcesPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [linkUrl, setLinkUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -59,6 +61,26 @@ export default function MyResourcesPage() {
       setDescription('');
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch {
+      // handled by toast
+    }
+  };
+
+  const handleSubmitLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkUrl.trim()) return;
+
+    try {
+      const promise = dispatch(submitLink({ title, description, url: linkUrl, is_public: true })).unwrap();
+      toast.promise(promise, {
+        loading: 'Adding link...',
+        success: 'Link added',
+        error: (err) => (typeof err === 'string' ? err : 'Failed to add link'),
+      });
+      await promise;
+      setTitle('');
+      setDescription('');
+      setLinkUrl('');
     } catch {
       // handled by toast
     }
@@ -134,11 +156,14 @@ export default function MyResourcesPage() {
         description={description}
         file={file}
         fileInputRef={fileInputRef}
+        linkUrl={linkUrl}
         onTitleChange={setTitle}
         onDescriptionChange={setDescription}
         onFileChange={setFile}
         onRemoveFile={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-        onSubmit={handleUpload}
+        onLinkUrlChange={setLinkUrl}
+        onSubmitFile={handleUpload}
+        onSubmitLink={handleSubmitLink}
       />
       <ResourceTableCard
         resources={myResources}
@@ -153,6 +178,7 @@ export default function MyResourcesPage() {
         onCreateTag={handleCreateTag}
         onAssignTags={handleAssignTags}
         onRemoveTag={handleRemoveTag}
+        storageKey="viewMode:my-resources"
         hideActions
       />
     </div>
