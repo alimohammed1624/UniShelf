@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -52,18 +52,13 @@ interface UserLabelProps {
 }
 
 /**
- * Renders the uploader's first name with a styled custom tooltip
- * showing their full name and email (when available).
- * Falls back gracefully to "User #<id>" while loading or on error.
+ * Renders the uploader's first name with a styled CSS tooltip
+ * showing their email (when available) on hover.
  */
 export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   const [profile, setProfile] = useState<PublicProfile | null>(
     profileCache.get(userId) ?? null,
   );
-  const [tooltipVisible, setTooltipVisible] = useState(false);
-  const [tooltipPos, setTooltipPos] = useState<'above' | 'below'>('above');
-  const [tooltipCoords, setTooltipCoords] = useState<{ left: number; top: number } | null>(null);
-  const wrapperRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (preloaded) return;
@@ -80,7 +75,7 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
 
   const resolvedFullName = preloaded?.full_name ?? profile?.full_name ?? null;
   const resolvedEmail    = preloaded?.email    ?? profile?.email    ?? null;
-  const displayName = resolvedFullName ? firstName(resolvedFullName) : `User #${userId}`;
+  const displayName = resolvedFullName ? firstName(resolvedFullName) : '';
 
   // Tooltip: show email when available (name is already visible on screen).
   // Fall back to full name when it adds info beyond the displayed first name.
@@ -91,44 +86,20 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
         ? resolvedFullName
         : null;
 
-  const handleMouseEnter = () => {
-    if (!tooltipContent || !wrapperRef.current) return;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const above = rect.top > 80;
-    setTooltipPos(above ? 'above' : 'below');
-    setTooltipCoords({
-      left: rect.left,
-      top: above ? rect.top - 8 : rect.bottom + 8,
-    });
-    setTooltipVisible(true);
-  };
-
   return (
-    <span
-      ref={wrapperRef}
-      className={`relative inline-flex items-center gap-1 ${className ?? ''}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setTooltipVisible(false)}
-    >
+    <span className={`group relative inline-flex items-center gap-1 hover:z-[9999] ${className ?? ''}`}>
       {/* Icon + name pill */}
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[oklch(0.78_0.18_280)] bg-[oklch(0.68_0.24_280/12%)] text-xs font-medium transition-colors hover:bg-[oklch(0.68_0.24_280/22%)] cursor-default select-none">
         <User className="h-3 w-3 opacity-70 shrink-0" />
         {displayName}
       </span>
 
-      {/* Custom tooltip — fixed positioning escapes overflow-x-auto clipping */}
-      {tooltipContent && tooltipVisible && tooltipCoords && (
+      {/* CSS tooltip — follows the trigger element regardless of transforms or overflow */}
+      {tooltipContent && (
         <span
-          className="pointer-events-none fixed z-[9999] min-w-max rounded-md bg-[oklch(0.20_0.04_280)] border border-[oklch(0.68_0.24_280/25%)] px-3 py-2 shadow-lg shadow-[oklch(0.68_0.24_280/15%)]"
-          style={{
-            left: tooltipCoords.left,
-            top: tooltipCoords.top,
-            transform: tooltipPos === 'above' ? 'translateY(-100%)' : 'translateY(0)',
-          }}
+          className="pointer-events-none absolute top-full left-1/2 z-[9999] -translate-x-1/2 translate-y-3 whitespace-nowrap rounded-md bg-[#171421] border border-[oklch(0.68_0.24_280/25%)] px-3 py-2 text-xs text-[oklch(0.78_0.14_280)] shadow-lg shadow-[oklch(0.68_0.24_280/15%)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         >
-          <span className="text-xs text-[oklch(0.78_0.14_280)] whitespace-nowrap leading-tight">
-            {tooltipContent}
-          </span>
+          {tooltipContent}
         </span>
       )}
     </span>

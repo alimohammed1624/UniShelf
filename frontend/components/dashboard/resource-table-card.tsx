@@ -381,9 +381,8 @@ export function ResourceTableCard({
 
             {editingResource && (
               <div className="my-4 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground space-y-1">
-                <p><span className="font-medium text-foreground">ID:</span> {editingResource.id}</p>
-                <p><span className="font-medium text-foreground">File:</span> {editingResource.file_path}</p>
                 <p><span className="font-medium text-foreground">Uploader:</span> <UserLabel userId={editingResource.uploader_id} /></p>
+                <p><span className="font-medium text-foreground">Directory:</span> {editingResource.hierarchy ? editingResource.hierarchy.replace(/\./g, '/') : '—'}</p>
                 <p><span className="font-medium text-foreground">Created:</span> {new Date(editingResource.created_at).toLocaleString()}</p>
               </div>
             )}
