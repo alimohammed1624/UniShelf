@@ -4,7 +4,7 @@
 
 ```bash
 cp env.example .env                          # required before any local work
-docker compose up --build                    # full stack (db, minio, backend, frontend, nginx, prometheus, grafana)
+docker compose up --build -d                    # full stack (db, minio, backend, frontend, nginx, prometheus, grafana)
 ```
 
 **Do NOT run `uv`, `npm`, or `bun` locally.** The entire dev environment is containerised — every toolchain dependency is installed and executed inside Docker Compose services. Running these tools on the host will create out-of-sync state, leaked local files, and wasted effort.
@@ -19,7 +19,7 @@ docker compose up --build                    # full stack (db, minio, backend, f
 ## Code Consistency
 
 - Maintain consistency with existing patterns — style, naming, imports, file structure, and error handling.
-- Before adding new code, inspect similar existing files to match conventions (e.g., how controllers structure routers/schemas/__init__.py, how frontend pages organize components).
+- Before adding new code, inspect similar existing files to match conventions (e.g., how controllers structure routers/schemas/**init**.py, how frontend pages organize components).
 - Don't introduce new libraries, patterns, or styles unless the user explicitly asks for it.
 
 ## Toolchain Requirements
@@ -48,6 +48,7 @@ frontend/app/
 ```
 
 Key notes:
+
 - All routers are mounted at the root prefix in `main.py` (no `/api/v1` prefix). Check router files to find endpoints.
 - Frontend uses `@/*` path alias resolving to the frontend root directory (`tsconfig.json` paths config).
 - MinIO bucket is auto-created on backend startup via `ensure_bucket_exists()`. If upload flows break, verify the bucket exists in MinIO first.
