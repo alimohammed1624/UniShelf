@@ -336,6 +336,7 @@ function ResourcesPanel() {
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Filename</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Owner</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Visibility</th>
+            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Uploaded</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Archived</th>
             {userRole === 3 && (
               <th className="text-left py-2 font-medium text-muted-foreground">Actions</th>
@@ -345,7 +346,7 @@ function ResourcesPanel() {
         <tbody>
           {filteredResources.length === 0 ? (
             <tr>
-              <td colSpan={userRole === 3 ? 6 : 5} className="py-8 text-center text-sm text-muted-foreground">
+              <td colSpan={userRole === 3 ? 7 : 6} className="py-8 text-center text-sm text-muted-foreground">
                 {emptyMessage()}
               </td>
             </tr>
@@ -365,6 +366,7 @@ function ResourcesPanel() {
                   {getVisibilityBadge(resource.is_public)}
                 </span>
               </td>
+              <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{new Date(resource.created_at).toLocaleDateString()}</td>
               <td className="py-2 pr-4">
                 {resource.is_archived ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Archived</span>

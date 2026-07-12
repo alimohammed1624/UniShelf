@@ -301,29 +301,25 @@ function SearchPageContent() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+      {/* Sidebar Filters */}
       <div>
+        <AdvancedFilters
+          filters={advancedFilters}
+          onFilterChange={handleFilterChange}
+          onClearAll={handleClearAllFilters}
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="space-y-4">
         <h1 className="text-3xl font-bold mb-2">Search Resources</h1>
         <p className="text-muted-foreground">
           Find academic materials with advanced filtering and search
         </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Filters */}
-        <div className="lg:col-span-1">
-          <AdvancedFilters
-            filters={advancedFilters}
-            onFilterChange={handleFilterChange}
-            onClearAll={handleClearAllFilters}
-            allTags={allTags}
-            selectedTags={selectedTags}
-            onTagToggle={handleTagToggle}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:col-span-3 space-y-4">
           {/* Search Input */}
           <Input
             type="text"
@@ -387,7 +383,6 @@ function SearchPageContent() {
             />
           )}
         </div>
-      </div>
     </div>
   );
 }

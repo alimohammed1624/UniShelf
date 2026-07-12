@@ -299,6 +299,7 @@ export function ResourceTableCard({
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
+                  <TableHead>Upload Date</TableHead>
                   {!hideActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -321,6 +322,7 @@ export function ResourceTableCard({
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
                     <TableCell><UserLabel userId={resource.uploader_id} /></TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(resource.created_at).toLocaleDateString()}</TableCell>
                     {!hideActions && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -354,6 +356,9 @@ export function ResourceTableCard({
                     {resource.tags.map((tag) => (
                       <Badge key={tag.id} variant="secondary" className="text-xs">{tag.name}</Badge>
                     ))}
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Uploaded: {new Date(resource.created_at).toLocaleDateString()}
                   </div>
                   <div className="text-xs text-muted-foreground mb-3">
                     {resource.is_public ? 'Public' : 'Private'} • <UserLabel userId={resource.uploader_id} />
