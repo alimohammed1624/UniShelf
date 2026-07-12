@@ -54,18 +54,18 @@
   --card-foreground: oklch(0.18 0.02 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.19 280);
-  --primary-foreground: oklch(0.98 0.01 280);
+  --primary: oklch(0.55 0.13 75);
+  --primary-foreground: oklch(0.98 0.01 38);
   --secondary: oklch(0.94 0.02 220);
   --secondary-foreground: oklch(0.28 0.02 240);
   --muted: oklch(0.95 0.01 230);
   --muted-foreground: oklch(0.48 0.02 240);
-  --accent: oklch(0.93 0.04 280);
-  --accent-foreground: oklch(0.22 0.03 280);
+  --accent: oklch(0.93 0.04 75);
+  --accent-foreground: oklch(0.22 0.03 75);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.86 0.02 230);
   --input: oklch(0.9 0.02 230);
-  --ring: oklch(0.64 0.16 280);
+  --ring: oklch(0.64 0.13 75);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -90,9 +90,9 @@
   --popover: oklch(0.155 0.026 272);
   --popover-foreground: oklch(0.95 0.01 272);
 
-  /* ── Vibrant violet-indigo primary ── */
-  --primary: oklch(0.68 0.24 280);
-  --primary-foreground: oklch(0.99 0.002 280);
+  /* ── Calm green-orange primary ── */
+  --primary: oklch(0.68 0.14 75);
+  --primary-foreground: oklch(0.99 0.002 38);
 
   /* ── Supporting tones ── */
   --secondary: oklch(0.21 0.035 275);
@@ -101,33 +101,33 @@
   --muted-foreground: oklch(0.58 0.05 272);
 
   /* ── Accent (hover tint) ── */
-  --accent: oklch(0.25 0.07 280);
-  --accent-foreground: oklch(0.92 0.012 280);
+  --accent: oklch(0.25 0.06 75);
+  --accent-foreground: oklch(0.92 0.012 38);
 
-  /* ── Destructive (muted rose-red that fits the violet world) ── */
+  /* ── Destructive ── */
   --destructive: oklch(0.6 0.2 15);
 
   /* ── Borders & inputs ── */
-  --border: oklch(0.68 0.24 280 / 14%);
+  --border: oklch(0.68 0.14 75 / 14%);
   --input: oklch(1 0 0 / 8%);
-  --ring: oklch(0.68 0.24 280);
+  --ring: oklch(0.68 0.14 75);
 
   /* ── Charts ── */
-  --chart-1: oklch(0.65 0.22 280);
+  --chart-1: oklch(0.65 0.22 50);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-4: oklch(0.68 0.14 75);
   --chart-5: oklch(0.645 0.246 16.439);
 
   /* ── Sidebar ── */
   --sidebar: oklch(0.14 0.028 272);
   --sidebar-foreground: oklch(0.95 0.01 272);
-  --sidebar-primary: oklch(0.68 0.24 280);
-  --sidebar-primary-foreground: oklch(0.99 0.002 280);
+  --sidebar-primary: oklch(0.68 0.14 75);
+  --sidebar-primary-foreground: oklch(0.99 0.002 38);
   --sidebar-accent: oklch(0.22 0.05 278);
   --sidebar-accent-foreground: oklch(0.92 0.012 275);
-  --sidebar-border: oklch(0.68 0.24 280 / 12%);
-  --sidebar-ring: oklch(0.68 0.24 280);
+  --sidebar-border: oklch(0.68 0.14 75 / 12%);
+  --sidebar-ring: oklch(0.68 0.14 75);
 }
 
 @layer base {
@@ -136,13 +136,6 @@
   }
   body {
     @apply bg-background text-foreground;
-  }
-
-  /* Ambient violet glow behind the whole dark page */
-  .dark body {
-    background-image:
-      radial-gradient(ellipse 80% 40% at 50% -5%, oklch(0.68 0.24 280 / 10%) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 30% at 95% 90%, oklch(0.55 0.20 290 / 7%) 0%, transparent 55%);
   }
 
   /* Accent scrollbar */
@@ -154,11 +147,11 @@
     background: transparent;
   }
   .dark ::-webkit-scrollbar-thumb {
-    background: oklch(0.68 0.24 280 / 35%);
+    background: oklch(0.68 0.14 75 / 35%);
     border-radius: 9999px;
   }
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.68 0.24 280 / 60%);
+    background: oklch(0.68 0.14 75 / 60%);
   }
 }
 
@@ -171,45 +164,19 @@
   justify-content: center;
   padding: 1rem;
   background: var(--background);
-  background-image:
-    radial-gradient(ellipse 70% 55% at 50% -5%, oklch(0.68 0.24 280 / 16%) 0%, transparent 65%),
-    radial-gradient(ellipse 45% 35% at 85% 95%, oklch(0.55 0.20 295 / 10%) 0%, transparent 60%),
-    radial-gradient(ellipse 35% 25% at 10% 80%, oklch(0.60 0.22 265 / 7%) 0%, transparent 55%);
 }
 
 .auth-shell__glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse 55% 45% at 50% -8%, oklch(0.68 0.24 280 / 20%) 0%, transparent 70%);
+  display: none;
 }
 
 .auth-card {
   position: relative;
   width: min(100%, 25rem);
-  border: 1px solid oklch(0.68 0.24 280 / 20%);
+  border: 1px solid oklch(0.68 0.14 75 / 20%);
   background: var(--card);
   overflow: hidden;
-  box-shadow:
-    0 0 0 1px oklch(0.68 0.24 280 / 8%),
-    0 8px 40px oklch(0.68 0.24 280 / 12%),
-    0 2px 8px oklch(0 0 0 / 40%);
-}
-
-/* Top accent line on auth card */
-.auth-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    oklch(0.68 0.24 280) 30%,
-    oklch(0.72 0.20 265) 70%,
-    transparent 100%
-  );
+  box-shadow: 0 2px 8px oklch(0 0 0 / 40%);
 }
 
 .auth-card form {
@@ -239,43 +206,38 @@
 
 /* ── Navbar active link ── */
 .nav-link-active {
-  background: oklch(0.68 0.24 280 / 18%) !important;
-  color: oklch(0.82 0.18 280) !important;
+  background: oklch(0.68 0.14 75 / 18%) !important;
+  color: oklch(0.82 0.13 75) !important;
 }
 
-/* ── Brand logo gradient ── */
+/* ── Brand logo ── */
 .brand-logo {
-  background: linear-gradient(135deg, oklch(0.82 0.18 280), oklch(0.68 0.24 265));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: oklch(0.72 0.13 75);
 }
 
 /* ── Card accent top border ── */
 .dark [data-slot="card"] {
-  border-color: oklch(0.68 0.24 280 / 14%);
-  box-shadow:
-    0 1px 3px oklch(0 0 0 / 30%),
-    0 0 0 1px oklch(0.68 0.24 280 / 6%) inset;
+  border-color: oklch(0.68 0.14 75 / 14%);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 30%);
 }
 
 /* ── Table row hover accent ── */
 .dark [data-slot="table-row"]:hover {
-  background: oklch(0.68 0.24 280 / 5%);
+  background: oklch(0.68 0.14 75 / 5%);
 }
 
-/* ── Input focus violet glow ── */
+/* ── Input focus ring ── */
 .dark [data-slot="input"]:focus-visible,
 .dark [data-slot="textarea"]:focus-visible {
-  border-color: oklch(0.68 0.24 280 / 60%);
-  box-shadow: 0 0 0 3px oklch(0.68 0.24 280 / 18%);
+  border-color: oklch(0.68 0.14 75 / 60%);
+  box-shadow: 0 0 0 3px oklch(0.68 0.14 75 / 12%);
 }
 
 /* ── Badge secondary accent ── */
 .dark [data-slot="badge"][data-variant="secondary"] {
-  background: oklch(0.68 0.24 280 / 18%);
-  color: oklch(0.82 0.16 280);
-  border-color: oklch(0.68 0.24 280 / 25%);
+  background: oklch(0.68 0.14 75 / 18%);
+  color: oklch(0.82 0.13 75);
+  border-color: oklch(0.68 0.14 75 / 25%);
 }
 
 /* ── Native <select> / <option> dark theme ── */
@@ -283,14 +245,14 @@
 select.admin-select {
   color-scheme: dark;
   background-color: oklch(0.155 0.026 272);
-  color: oklch(0.92 0.012 280);
+  color: oklch(0.92 0.012 38);
 }
 select.admin-select option {
   background-color: oklch(0.155 0.026 272);
-  color: oklch(0.92 0.012 280);
+  color: oklch(0.92 0.012 38);
 }
 select.admin-select option:checked,
 select.admin-select option:hover {
-  background-color: oklch(0.25 0.07 280);
+  background-color: oklch(0.25 0.06 75);
   color: oklch(0.95 0.01 272);
 }

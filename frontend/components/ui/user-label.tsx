@@ -89,7 +89,7 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   return (
     <span className={`group relative inline-flex items-center gap-1 hover:z-[9999] ${className ?? ''}`}>
       {/* Icon + name pill */}
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[oklch(0.78_0.18_280)] bg-[oklch(0.68_0.24_280/12%)] text-xs font-medium transition-colors hover:bg-[oklch(0.68_0.24_280/22%)] cursor-default select-none">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[oklch(0.78_0.14_75)] bg-[oklch(0.68_0.14_75/12%)] text-xs font-medium transition-colors hover:bg-[oklch(0.68_0.14_75/22%)] cursor-default select-none">
         <User className="h-3 w-3 opacity-70 shrink-0" />
         {displayName}
       </span>
@@ -97,7 +97,7 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
       {/* CSS tooltip — follows the trigger element regardless of transforms or overflow */}
       {tooltipContent && (
         <span
-          className="pointer-events-none absolute top-full left-1/2 z-[9999] -translate-x-1/2 translate-y-3 whitespace-nowrap rounded-md bg-[#171421] border border-[oklch(0.68_0.24_280/25%)] px-3 py-2 text-xs text-[oklch(0.78_0.14_280)] shadow-lg shadow-[oklch(0.68_0.24_280/15%)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="pointer-events-none absolute top-full left-1/2 z-[9999] -translate-x-1/2 translate-y-3 whitespace-nowrap rounded-md bg-[#171421] border border-[oklch(0.68_0.14_75/25%)] px-3 py-2 text-xs text-[oklch(0.78_0.14_75)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         >
           {tooltipContent}
         </span>

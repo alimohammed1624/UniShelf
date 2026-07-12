@@ -34,7 +34,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[oklch(0.68_0.24_280/18%)] bg-background/80 backdrop-blur-md shadow-[0_1px_0_oklch(0.68_0.24_280/12%)]">
+    <header className="sticky top-0 z-50 border-b border-[oklch(0.68_0.14_75/18%)] bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <span className="brand-logo text-lg font-bold tracking-tight">UniShelf</span>
         <nav className="flex items-center gap-1">

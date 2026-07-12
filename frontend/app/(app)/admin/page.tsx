@@ -46,13 +46,13 @@ function ThemeSelect<T extends string>({
           gap: '0.4rem',
           padding: '0 0.75rem',
           borderRadius: '0.375rem',
-          border: `1px solid oklch(0.68 0.24 280 / ${open ? '80%' : '45%'})`,
+          border: `1px solid oklch(0.68 0.14 75 / ${open ? '80%' : '45%'})`,
           background: 'oklch(0.155 0.026 272)',
-          color: 'oklch(0.82 0.12 280)',
+          color: 'oklch(0.82 0.13 75)',
           fontSize: '0.875rem',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
-          boxShadow: open ? '0 0 0 2px oklch(0.68 0.24 280 / 25%)' : 'none',
+          boxShadow: open ? '0 0 0 2px oklch(0.68 0.14 75 / 25%)' : 'none',
           transition: 'border-color 0.15s, box-shadow 0.15s',
           outline: 'none',
           minWidth: '6rem',
@@ -81,9 +81,9 @@ function ThemeSelect<T extends string>({
             minWidth: '100%',
             zIndex: 50,
             background: 'oklch(0.155 0.026 272)',
-            border: '1px solid oklch(0.68 0.24 280 / 40%)',
+            border: '1px solid oklch(0.68 0.14 75 / 40%)',
             borderRadius: '0.375rem',
-            boxShadow: '0 8px 24px oklch(0 0 0 / 50%), 0 0 0 1px oklch(0.68 0.24 280 / 12%) inset',
+            boxShadow: '0 8px 24px oklch(0 0 0 / 50%), 0 0 0 1px oklch(0.68 0.14 75 / 12%) inset',
             overflow: 'hidden',
           }}
         >
@@ -102,18 +102,18 @@ function ThemeSelect<T extends string>({
                 border: 'none',
                 outline: 'none',
                 background: opt.value === value
-                  ? 'oklch(0.68 0.24 280 / 22%)'
+                  ? 'oklch(0.68 0.14 75 / 22%)'
                   : 'transparent',
                 color: opt.value === value
-                  ? 'oklch(0.88 0.18 280)'
+                  ? 'oklch(0.88 0.16 75)'
                   : 'oklch(0.85 0.02 272)',
                 fontWeight: opt.value === value ? 500 : 400,
                 transition: 'background 0.1s, color 0.1s',
               }}
               onMouseEnter={(e) => {
                 if (opt.value !== value) {
-                  e.currentTarget.style.background = 'oklch(0.68 0.24 280 / 12%)';
-                  e.currentTarget.style.color = 'oklch(0.88 0.12 280)';
+                  e.currentTarget.style.background = 'oklch(0.68 0.14 75 / 12%)';
+                  e.currentTarget.style.color = 'oklch(0.88 0.13 75)';
                 }
               }}
               onMouseLeave={(e) => {
