@@ -337,37 +337,61 @@ export function ResourceTableCard({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {resources.map((resource) => (
-                <div key={resource.id} className="border border-[oklch(0.68_0.14_75/15%)] rounded-lg p-4 hover:border-[oklch(0.68_0.14_75/35%)] transition-all duration-200 bg-card relative overflow-hidden">
-                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-3">
+                <div key={resource.id} className="border border-[oklch(0.68_0.14_75/15%)] rounded-lg p-5 hover:border-[oklch(0.68_0.14_75/35%)] transition-all duration-200 bg-card relative overflow-hidden flex flex-col group">
+                  {/* Thumbnail */}
+                  <div className="aspect-[4/3] bg-muted/50 rounded-md border border-border/50 flex items-center justify-center mb-4 overflow-hidden">
                     {thumbnails[resource.id] ? (
-                      <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover rounded-md" />
+                      <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover" />
                     ) : (
-                      <FileIcon className="h-8 w-8 text-muted-foreground" />
+                      <FileIcon className="h-10 w-10 text-muted-foreground/60" />
                     )}
                   </div>
-                  <h3 className="font-medium text-sm mb-1 truncate">
-                    <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
+
+                  {/* Title */}
+                  <h3 className="font-semibold text-base leading-tight mb-1 line-clamp-2">
+                    <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline underline-offset-4">
                       {resource.title}
                     </Link>
                   </h3>
-                  <p className="text-xs text-muted-foreground mb-2 truncate">{resource.filename ?? 'No filename'}</p>
-                  <p className="text-xs mb-2 truncate">{resource.description || 'No description'}</p>
-                  <div className="flex flex-wrap gap-1 mb-2">
+
+                  {/* Filename */}
+                  <p className="text-xs text-muted-foreground mb-2 truncate" title={resource.filename ?? undefined}>
+                    {resource.filename ?? 'No filename'}
+                  </p>
+
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground/80 mb-3 line-clamp-2 leading-relaxed">
+                    {resource.description || 'No description'}
+                  </p>
+
+                  {/* Tags */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {resource.tags.map((tag) => (
                       <Badge key={tag.id} variant="secondary" className="text-xs">{tag.name}</Badge>
                     ))}
                   </div>
-                  <div className="text-xs text-muted-foreground mb-1">
-                    Uploaded: {new Date(resource.created_at).toLocaleDateString()}
+
+                  {/* Spacer to push metadata + actions to bottom */}
+                  <div className="flex-1" />
+
+                  {/* Metadata row */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-3 pt-2 border-t border-border/40">
+                    <span>{new Date(resource.created_at).toLocaleDateString()}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${resource.is_public ? 'bg-green-500/70' : 'bg-muted-foreground/40'}`} />
+                      {resource.is_public ? 'Public' : 'Private'}
+                    </span>
                   </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    {resource.is_public ? 'Public' : 'Private'} • <UserLabel userId={resource.uploader_id} />
+
+                  {/* Uploader + Actions */}
+                  <div className="flex items-center justify-between gap-2">
+                    <UserLabel userId={resource.uploader_id} />
+                    {!hideActions && (
+                      <div className="flex flex-wrap gap-1.5 ml-auto">
+                        {renderActions(resource)}
+                      </div>
+                    )}
                   </div>
-                  {!hideActions && (
-                    <div className="flex flex-wrap gap-1">
-                      {renderActions(resource)}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

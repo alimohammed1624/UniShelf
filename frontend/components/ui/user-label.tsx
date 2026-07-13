@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { User } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -60,6 +60,11 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
     profileCache.get(userId) ?? null,
   );
 
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<'above' | 'below'>('above');
+  const [tooltipCoords, setTooltipCoords] = useState<{ left: number; top: number } | null>(null);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
+
   useEffect(() => {
     if (preloaded) return;
     if (profileCache.has(userId)) {
@@ -86,18 +91,33 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
         ? resolvedFullName
         : null;
 
+  const handleMouseEnter = () => {
+    if (!tooltipContent || !wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const above = rect.top > 80;
+    setTooltipPos(above ? 'above' : 'below');
+    setTooltipCoords({ left: rect.left, top: above ? rect.top - 8 : rect.bottom + 8 });
+    setTooltipVisible(true);
+  };
+
+  const handleMouseLeave = () => {
+    setTooltipVisible(false);
+    setTooltipCoords(null);
+  };
+
   return (
-    <span className={`group relative inline-flex items-center gap-1 hover:z-[9999] ${className ?? ''}`}>
+    <span ref={wrapperRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className={`inline-flex items-center gap-1 ${className ?? ''}`}>
       {/* Icon + name pill */}
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[oklch(0.78_0.14_75)] bg-[oklch(0.68_0.14_75/12%)] text-xs font-medium transition-colors hover:bg-[oklch(0.68_0.14_75/22%)] cursor-default select-none">
         <User className="h-3 w-3 opacity-70 shrink-0" />
         {displayName}
       </span>
 
-      {/* CSS tooltip — follows the trigger element regardless of transforms or overflow */}
-      {tooltipContent && (
+      {/* Custom tooltip — fixed positioning escapes overflow-x-auto clipping */}
+      {tooltipContent && tooltipVisible && tooltipCoords && (
         <span
-          className="pointer-events-none absolute top-full left-1/2 z-[9999] -translate-x-1/2 translate-y-3 whitespace-nowrap rounded-md bg-[#171421] border border-[oklch(0.68_0.14_75/25%)] px-3 py-2 text-xs text-[oklch(0.78_0.14_75)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="pointer-events-none fixed z-[9999] min-w-max rounded-md bg-[#171421] border border-[oklch(0.68_0.14_75/25%)] px-3 py-2 text-xs text-[oklch(0.78_0.14_75)]"
+          style={{ left: tooltipCoords.left, top: tooltipCoords.top, transform: tooltipPos === 'above' ? 'translateY(-100%)' : 'translateY(0)' }}
         >
           {tooltipContent}
         </span>
