@@ -78,6 +78,7 @@ const authSlice = createSlice({
       state.error = null;
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
+        sessionStorage.removeItem('search:filters');
       }
     },
     initializeAuth: (state) => {

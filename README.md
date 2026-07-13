@@ -7,7 +7,7 @@ A centralized academic resource sharing platform for university ecosystems. Stud
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 15+ (App Router), TypeScript, Tailwind CSS |
-| Backend | FastAPI, SQLAlchemy |
+| Backend | FastAPI(version 0.136.3 or earlier), SQLAlchemy |
 | Database | PostgreSQL |
 | Object Storage | MinIO (S3-compatible) |
 | Auth | JWT (OAuth2 Password Flow) |

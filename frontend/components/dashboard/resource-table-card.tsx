@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { UserLabel } from '@/components/ui/user-label';
 import {
   Table,
   TableBody,
@@ -44,6 +45,8 @@ interface ResourceTableCardProps {
   onRemoveTag: (resourceId: number, tagId: number) => Promise<boolean>;
   bookmarkedResourceIds?: number[];
   onToggleBookmark?: (id: number, title: string) => void;
+  hideActions?: boolean;
+  storageKey?: string;
 }
 
 export function ResourceTableCard({
@@ -61,6 +64,8 @@ export function ResourceTableCard({
   onRemoveTag,
   bookmarkedResourceIds = [],
   onToggleBookmark,
+  hideActions = false,
+  storageKey = 'viewMode:default',
 }: ResourceTableCardProps) {
   const isOwnerOrAdmin = (resource: Resource) =>
     resource.owner_id === currentUserId || currentUserRole >= 2;
@@ -82,8 +87,16 @@ export function ResourceTableCard({
   const [taggingResource, setTaggingResource] = useState<Resource | null>(null);
   const [newTagName, setNewTagName] = useState('');
 
-  // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  // View mode state — persisted per page via localStorage
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    return (localStorage.getItem(storageKey) as 'list' | 'grid') ?? 'list';
+  });
+
+  const setAndPersistViewMode = (mode: 'list' | 'grid') => {
+    localStorage.setItem(storageKey, mode);
+    setViewMode(mode);
+  };
 
   // Thumbnail state
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -210,19 +223,27 @@ export function ResourceTableCard({
           )}
         </Button>
       )}
-      {resource.type !== 'directory' && (
+      {resource.type === 'link' ? (
+        <Button size="sm" asChild>
+          <a href={resource.file_path ?? '#'} target="_blank" rel="noopener noreferrer">
+            Open Link
+          </a>
+        </Button>
+      ) : resource.type !== 'directory' && (
         <Button size="sm" onClick={() => onDownload(resource.id, resource.title)}>
           Download
         </Button>
       )}
-      {isOwnerOrAdmin(resource) && (
+      {!hideActions && isOwnerOrAdmin(resource) && (
         <>
           <Button size="sm" variant="outline" onClick={() => openEditModal(resource)}>
             Edit
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
-            Change
-          </Button>
+          {resource.type !== 'link' && (
+            <Button size="sm" variant="secondary" onClick={() => setChangingResource(resource)}>
+              Change
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setTaggingResource(resource)}>
             Tags
           </Button>
@@ -249,7 +270,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => setAndPersistViewMode('list')}
                 aria-label="List view"
               >
                 <List className="h-4 w-4" />
@@ -257,7 +278,7 @@ export function ResourceTableCard({
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('grid')}
+                onClick={() => setAndPersistViewMode('grid')}
                 aria-label="Grid view"
               >
                 <Grid3x3 className="h-4 w-4" />
@@ -278,7 +299,8 @@ export function ResourceTableCard({
                   <TableHead>Description</TableHead>
                   <TableHead>Visibility</TableHead>
                   <TableHead>Uploader</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Upload Date</TableHead>
+                  {!hideActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -299,12 +321,15 @@ export function ResourceTableCard({
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{resource.description}</TableCell>
                     <TableCell className="capitalize">{resource.is_public ? 'Public' : 'Private'}</TableCell>
-                    <TableCell>User #{resource.uploader_id}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {renderActions(resource)}
-                      </div>
-                    </TableCell>
+                    <TableCell><UserLabel userId={resource.uploader_id} /></TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(resource.created_at).toLocaleDateString()}</TableCell>
+                    {!hideActions && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {renderActions(resource)}
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -312,31 +337,60 @@ export function ResourceTableCard({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {resources.map((resource) => (
-                <div key={resource.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center mb-3">
+                <div key={resource.id} className="border border-[oklch(0.68_0.14_75/15%)] rounded-lg p-5 hover:border-[oklch(0.68_0.14_75/35%)] transition-all duration-200 bg-card relative overflow-hidden flex flex-col group">
+                  {/* Thumbnail */}
+                  <div className="aspect-[4/3] bg-muted/50 rounded-md border border-border/50 flex items-center justify-center mb-4 overflow-hidden">
                     {thumbnails[resource.id] ? (
-                      <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover rounded-md" />
+                      <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover" />
                     ) : (
-                      <FileIcon className="h-8 w-8 text-muted-foreground" />
+                      <FileIcon className="h-10 w-10 text-muted-foreground/60" />
                     )}
                   </div>
-                  <h3 className="font-medium text-sm mb-1 truncate">
-                    <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
+
+                  {/* Title */}
+                  <h3 className="font-semibold text-base leading-tight mb-1 line-clamp-2">
+                    <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline underline-offset-4">
                       {resource.title}
                     </Link>
                   </h3>
-                  <p className="text-xs text-muted-foreground mb-2 truncate">{resource.filename ?? 'No filename'}</p>
-                  <p className="text-xs mb-2 truncate">{resource.description || 'No description'}</p>
-                  <div className="flex flex-wrap gap-1 mb-2">
+
+                  {/* Filename */}
+                  <p className="text-xs text-muted-foreground mb-2 truncate" title={resource.filename ?? undefined}>
+                    {resource.filename ?? 'No filename'}
+                  </p>
+
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground/80 mb-3 line-clamp-2 leading-relaxed">
+                    {resource.description || 'No description'}
+                  </p>
+
+                  {/* Tags */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {resource.tags.map((tag) => (
                       <Badge key={tag.id} variant="secondary" className="text-xs">{tag.name}</Badge>
                     ))}
                   </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    {resource.is_public ? 'Public' : 'Private'} • User #{resource.uploader_id}
+
+                  {/* Spacer to push metadata + actions to bottom */}
+                  <div className="flex-1" />
+
+                  {/* Metadata row */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-3 pt-2 border-t border-border/40">
+                    <span>{new Date(resource.created_at).toLocaleDateString()}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${resource.is_public ? 'bg-green-500/70' : 'bg-muted-foreground/40'}`} />
+                      {resource.is_public ? 'Public' : 'Private'}
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {renderActions(resource)}
+
+                  {/* Uploader + Actions */}
+                  <div className="flex items-center justify-between gap-2">
+                    <UserLabel userId={resource.uploader_id} />
+                    {!hideActions && (
+                      <div className="flex flex-wrap gap-1.5 ml-auto">
+                        {renderActions(resource)}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -356,9 +410,8 @@ export function ResourceTableCard({
 
             {editingResource && (
               <div className="my-4 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground space-y-1">
-                <p><span className="font-medium text-foreground">ID:</span> {editingResource.id}</p>
-                <p><span className="font-medium text-foreground">File:</span> {editingResource.file_path}</p>
-                <p><span className="font-medium text-foreground">Uploader:</span> User #{editingResource.uploader_id}</p>
+                <p><span className="font-medium text-foreground">Uploader:</span> <UserLabel userId={editingResource.uploader_id} /></p>
+                <p><span className="font-medium text-foreground">Directory:</span> {editingResource.hierarchy ? editingResource.hierarchy.replace(/\./g, '/') : '—'}</p>
                 <p><span className="font-medium text-foreground">Created:</span> {new Date(editingResource.created_at).toLocaleString()}</p>
               </div>
             )}

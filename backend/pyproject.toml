@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "UniShelf backend API"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[standard]",
+    "fastapi[standard]<0.137.0",
     "sqlalchemy",
     "psycopg2-binary",
     "python-multipart",

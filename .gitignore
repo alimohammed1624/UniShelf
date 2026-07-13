@@ -17,6 +17,8 @@ venv/
 .idea/
 .coverage
 .kiro/
+.opencode
+.claude
 .Python
 .vscode/
 

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { UserLabel } from '@/components/ui/user-label';
 
 type Tab = 'open' | 'archived';
 
@@ -123,9 +124,9 @@ export default function ModeratePage() {
                         {report.resource.title}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">User #{report.resource.uploader_id}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm"><UserLabel userId={report.resource.uploader_id} /></TableCell>
                     <TableCell className="max-w-xs truncate text-sm">{report.reason}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">User #{report.reported_by}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm"><UserLabel userId={report.reported_by} /></TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(report.created_at).toLocaleDateString()}
                     </TableCell>
