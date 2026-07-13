@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import { AdvancedFilters, AdvancedFilterState } from '@/components/search/AdvancedFilters';
@@ -24,15 +25,68 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export default function SearchPage() {
-  // Advanced filter state
-  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>({
-    searchQuery: '',
-    resourceTypes: [],
-    dateRange: null,
+const STORAGE_KEY = 'search:filters';
+
+const EMPTY_FILTERS: AdvancedFilterState = { searchQuery: '', resourceTypes: [], dateRange: null };
+
+function readStorage(): { filters: AdvancedFilterState; tags: string[] } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function writeStorage(filters: AdvancedFilterState, tags: string[]) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ filters, tags }));
+  } catch {}
+}
+
+function clearStorage() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+function SearchPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Tracks whether initial state was restored from sessionStorage (not URL),
+  // so we can sync it to the URL on the first effect run.
+  const restoredFromStorage = useRef(false);
+
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilterState>(() => {
+    const q = searchParams.get('q');
+    const types = searchParams.get('types');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    const tags = searchParams.get('tags');
+
+    if (q || types || tags || from || to) {
+      return {
+        searchQuery: q ?? '',
+        resourceTypes: types ? types.split(',') : [],
+        dateRange: from || to ? { from: from ?? '', to: to ?? '' } : null,
+      };
+    }
+
+    const stored = readStorage();
+    if (stored) {
+      restoredFromStorage.current = true;
+      return stored.filters;
+    }
+
+    return EMPTY_FILTERS;
   });
-  
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const tags = searchParams.get('tags');
+    if (tags) return tags.split(',');
+    // readStorage() again is fine — it's cheap and avoids cross-initializer coupling
+    return readStorage()?.tags ?? [];
+  });
+
   const [uploaders, setUploaders] = useState<UserPublicProfile[]>([]);
 
   const dispatch = useAppDispatch();
@@ -40,6 +94,16 @@ export default function SearchPage() {
   const { user } = useAppSelector((state) => state.auth);
   const { items: allTags } = useAppSelector((state) => state.tags);
   const bookmarkedResourceIds = useAppSelector((state) => state.bookmarks.ids);
+
+  // If we restored from sessionStorage (URL had no params), push state into the URL so
+  // the address bar reflects the active filters.
+  useEffect(() => {
+    if (!restoredFromStorage.current) return;
+    const params = buildParams(advancedFilters, selectedTags);
+    const qs = params.toString();
+    if (qs) router.replace(`${pathname}?${qs}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (resources.length === 0) dispatch(fetchResources());
@@ -54,22 +118,15 @@ export default function SearchPage() {
       ...new Set(resources.filter((r) => !r.is_anonymous).map((r) => r.uploader_id)),
     ];
 
-    // If there are no non-anonymous resources, clear uploaders and exit early.
     if (uniqueIds.length === 0) {
-      if (uploaders.length !== 0) {
-        setUploaders([]);
-      }
+      if (uploaders.length !== 0) setUploaders([]);
       return;
     }
 
-    // Build a cache index from already-fetched uploader profiles.
     const existingIds = new Set(uploaders.map((u) => (u as any).id ?? (u as any).uploader_id));
     const missingIds = uniqueIds.filter((id) => !existingIds.has(id));
 
-    // All required profiles are already cached; no need to refetch.
-    if (missingIds.length === 0) {
-      return;
-    }
+    if (missingIds.length === 0) return;
 
     Promise.all(
       missingIds.map((id) =>
@@ -82,32 +139,43 @@ export default function SearchPage() {
       const newProfiles = profiles.filter(Boolean) as UserPublicProfile[];
       if (newProfiles.length === 0) return;
 
-      // Merge newly fetched profiles into the existing cache, deduplicating by id.
       setUploaders((prev) => {
         const byId = new Map<string | number, UserPublicProfile>();
-
         for (const p of prev) {
           const key = (p as any).id ?? (p as any).uploader_id;
-          if (key != null && !byId.has(key)) {
-            byId.set(key, p);
-          }
+          if (key != null && !byId.has(key)) byId.set(key, p);
         }
-
         for (const p of newProfiles) {
           const key = (p as any).id ?? (p as any).uploader_id;
-          if (key != null && !byId.has(key)) {
-            byId.set(key, p);
-          }
+          if (key != null && !byId.has(key)) byId.set(key, p);
         }
-
         return Array.from(byId.values());
       });
     });
   }, [resources, uploaders]);
 
-  // Filter resources based on advanced filters
+  function buildParams(filters: AdvancedFilterState, tags: string[]) {
+    const params = new URLSearchParams();
+    if (filters.searchQuery) params.set('q', filters.searchQuery);
+    if (filters.resourceTypes.length > 0) params.set('types', filters.resourceTypes.join(','));
+    if (tags.length > 0) params.set('tags', tags.join(','));
+    if (filters.dateRange?.from) params.set('from', filters.dateRange.from);
+    if (filters.dateRange?.to) params.set('to', filters.dateRange.to);
+    return params;
+  }
+
+  function syncFilters(filters: AdvancedFilterState, tags: string[]) {
+    const params = buildParams(filters, tags);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    if (qs) {
+      writeStorage(filters, tags);
+    } else {
+      clearStorage();
+    }
+  }
+
   const filtered = resources.filter((r) => {
-    // Search query filter
     if (advancedFilters.searchQuery) {
       const q = advancedFilters.searchQuery.toLowerCase();
       const matchesSearch =
@@ -117,7 +185,6 @@ export default function SearchPage() {
       if (!matchesSearch) return false;
     }
 
-    // Resource type filter
     if (advancedFilters.resourceTypes.length > 0) {
       const matchesType = advancedFilters.resourceTypes.some((typeId) => {
         if (typeId === 'pdf' && r.type === 'application/pdf') return true;
@@ -130,7 +197,6 @@ export default function SearchPage() {
       if (!matchesType) return false;
     }
 
-    // Tags filter
     if (selectedTags.length > 0) {
       const matchesTags = selectedTags.every((tagName) =>
         r.tags.some((t) => t.name.toLowerCase() === tagName.toLowerCase())
@@ -138,18 +204,35 @@ export default function SearchPage() {
       if (!matchesTags) return false;
     }
 
-    // Date range filter
     if (advancedFilters.dateRange) {
       const resourceDate = new Date(r.created_at).toISOString().split('T')[0];
       const fromDate = advancedFilters.dateRange.from;
       const toDate = advancedFilters.dateRange.to;
-      
       if (fromDate && resourceDate < fromDate) return false;
       if (toDate && resourceDate > toDate) return false;
     }
 
     return true;
   });
+
+  const handleFilterChange = (filters: AdvancedFilterState) => {
+    setAdvancedFilters(filters);
+    syncFilters(filters, selectedTags);
+  };
+
+  const handleTagToggle = (tagName: string) => {
+    const newTags = selectedTags.includes(tagName)
+      ? selectedTags.filter((t) => t !== tagName)
+      : [...selectedTags, tagName];
+    setSelectedTags(newTags);
+    syncFilters(advancedFilters, newTags);
+  };
+
+  const handleClearAllFilters = () => {
+    setAdvancedFilters(EMPTY_FILTERS);
+    setSelectedTags([]);
+    syncFilters(EMPTY_FILTERS, []);
+  };
 
   const handleDownload = async (id: number, title: string) => {
     const promise = dispatch(downloadResource({ id, title })).unwrap();
@@ -217,54 +300,33 @@ export default function SearchPage() {
     );
   };
 
-  const handleClearAllFilters = () => {
-    setAdvancedFilters({
-      searchQuery: '',
-      resourceTypes: [],
-      dateRange: null,
-    });
-    setSelectedTags([]);
-  };
-
-  const handleTagToggle = (tagName: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagName)
-        ? prev.filter((t) => t !== tagName)
-        : [...prev, tagName]
-    );
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+      {/* Sidebar Filters */}
       <div>
+        <AdvancedFilters
+          filters={advancedFilters}
+          onFilterChange={handleFilterChange}
+          onClearAll={handleClearAllFilters}
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onTagToggle={handleTagToggle}
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="space-y-4">
         <h1 className="text-3xl font-bold mb-2">Search Resources</h1>
         <p className="text-muted-foreground">
           Find academic materials with advanced filtering and search
         </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Filters */}
-        <div className="lg:col-span-1">
-          <AdvancedFilters
-            filters={advancedFilters}
-            onFilterChange={setAdvancedFilters}
-            onClearAll={handleClearAllFilters}
-            allTags={allTags}
-            selectedTags={selectedTags}
-            onTagToggle={handleTagToggle}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="lg:col-span-3 space-y-4">
           {/* Search Input */}
           <Input
             type="text"
             placeholder="Search by title, description, or filename..."
             value={advancedFilters.searchQuery}
             onChange={(e) =>
-              setAdvancedFilters({ ...advancedFilters, searchQuery: e.target.value })
+              handleFilterChange({ ...advancedFilters, searchQuery: e.target.value })
             }
             className="text-base"
             autoFocus
@@ -296,10 +358,7 @@ export default function SearchPage() {
           {filtered.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-4">No resources match your filters</p>
-              <Button
-                variant="outline"
-                onClick={handleClearAllFilters}
-              >
+              <Button variant="outline" onClick={handleClearAllFilters}>
                 Clear all filters
               </Button>
             </div>
@@ -319,10 +378,19 @@ export default function SearchPage() {
               onRemoveTag={handleRemoveTag}
               bookmarkedResourceIds={bookmarkedResourceIds}
               onToggleBookmark={handleToggleBookmark}
+              storageKey="viewMode:search"
+              hideActions
             />
           )}
         </div>
-      </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchPageContent />
+    </Suspense>
   );
 }

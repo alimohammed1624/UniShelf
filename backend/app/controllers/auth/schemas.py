@@ -74,6 +74,7 @@ class UserSchema(UserBase):
 
 class UserPublicProfile(BaseModel):
     id: int
+    email: EmailStr
     full_name: str
     role: int
     created_at: datetime

@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     # Default provided for dev convenience, but should be overridden in prod
     SECRET_KEY: str = "dev-secret-key"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 20160
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000"
 
     # Upload limits
-    MAX_UPLOAD_SIZE_MB: int = 20
+    MAX_UPLOAD_SIZE_MB: int = 500
 
     # Tag limits
     MAX_TAGS_PER_RESOURCE: int = 20
