@@ -228,6 +228,11 @@ function SearchPageContent() {
     syncFilters(advancedFilters, newTags);
   };
 
+  const handleClearTags = () => {
+    setSelectedTags([]);
+    syncFilters(advancedFilters, []);
+  };
+
   const handleClearAllFilters = () => {
     setAdvancedFilters(EMPTY_FILTERS);
     setSelectedTags([]);
@@ -307,10 +312,10 @@ function SearchPageContent() {
         <AdvancedFilters
           filters={advancedFilters}
           onFilterChange={handleFilterChange}
-          onClearAll={handleClearAllFilters}
           allTags={allTags}
           selectedTags={selectedTags}
           onTagToggle={handleTagToggle}
+          onClearTags={handleClearTags}
         />
       </div>
 
