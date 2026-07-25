@@ -42,6 +42,17 @@ import { submitReport } from "@/lib/features/moderate/moderateSlice";
 import { toggleBookmarkAsync } from "@/lib/features/bookmarks/bookmarksSlice";
 import { PdfPreview } from "@/components/resources/pdf-preview";
 
+function isVideoLink(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const extension = parsed.pathname.split('.').pop()?.toLowerCase();
+    return ['mp4', 'webm', 'ogg', 'mov', 'm3u8'].includes(extension ?? '');
+  } catch {
+    return false;
+  }
+}
+
 export default function ResourceDetailPage({
   params,
 }: {
@@ -100,6 +111,7 @@ export default function ResourceDetailPage({
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+  const [videoFullscreen, setVideoFullscreen] = useState(false);
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
@@ -165,6 +177,7 @@ export default function ResourceDetailPage({
     pdfDocRef.current = null;
     setImageZoom(100);
     setImageFullscreen(false);
+    setVideoFullscreen(false);
     setImageBlobUrl(null);
     setImageLoading(false);
     setImagePreviewFailed(false);
@@ -369,12 +382,20 @@ export default function ResourceDetailPage({
   const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
   const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
   const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
-  const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
+  const isPreviewFullscreen = pdfFullscreen || imageFullscreen || videoFullscreen;
 
   const isPdf = resource?.type === "application/pdf";
   const isImage = resource?.type?.startsWith("image/");
   const isText = resource?.type?.startsWith("text/");
-  const canPreview = isPdf || isImage || isText;
+  const isVideo =
+    resource?.type?.startsWith("video/") ||
+    (resource?.type === "link" && isVideoLink(resource.file_path));
+  const videoSourceUrl = resource?.type?.startsWith("video/")
+    ? inlinePreviewUrl
+    : resource?.type === "link" && isVideoLink(resource.file_path)
+    ? resource.file_path ?? ''
+    : '';
+  const canPreview = isPdf || isImage || isText || isVideo;
   const isFirstPdfPage = pdfPage <= 1;
   // Disable Next while page count is unknown (loading) OR when on the last page
   const isLastPdfPage = !pdfNumPages || pdfPage >= pdfNumPages;
@@ -782,6 +803,38 @@ export default function ResourceDetailPage({
                           transformOrigin: "center",
                         }}
                       />
+                    )}
+                  </div>
+                </div>
+              )}
+              {isVideo && (
+                <div className="space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-muted-foreground">Video preview</div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setVideoFullscreen((prev) => !prev)}
+                    >
+                      {videoFullscreen ? 'Exit full screen' : 'Full screen'}
+                    </Button>
+                  </div>
+                  <div
+                    className={`flex ${videoFullscreen ? "h-[75vh]" : "h-[60vh]"} items-center justify-center overflow-hidden rounded-md border bg-muted/10`}
+                  >
+                    {videoSourceUrl ? (
+                      <video
+                        src={videoSourceUrl}
+                        controls
+                        className="max-h-full max-w-full object-contain"
+                      >
+                        Your browser does not support the HTML5 video player.
+                      </video>
+                    ) : (
+                      <div className="p-4 text-sm text-muted-foreground">
+                        Video preview is unavailable for this resource.
+                      </div>
                     )}
                   </div>
                 </div>
