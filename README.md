@@ -50,12 +50,15 @@ docker compose exec backend python seed_db.py --reset
 
 | Email | Password | Role |
 |-------|----------|------|
+| superadmin@unishelf.edu | Super123! | Super Admin |
 | admin@unishelf.edu | Admin123! | Admin |
+| admin2@unishelf.edu | Admin123! | Admin |
 | mod@unishelf.edu | Mod123! | Moderator |
 | student1@unishelf.edu | Student123! | Student |
 | student2@unishelf.edu | Student123! | Student |
+| banned@unishelf.edu | Student123! | Student (suspended) |
 
-The script creates 4 users, 18 tags across free-form categories, and ~20 resources organized in a logical folder hierarchy (for example `cse.intro`, `cse.core`, and `math.calculus`) with sample file content uploaded to MinIO.
+The script creates 7 users, 18 tags across free-form categories, and ~20 resources organized in a logical folder hierarchy (for example `cse.intro`, `cse.core`, and `math.calculus`) with sample file content uploaded to MinIO.
 
 ## Local Development
 

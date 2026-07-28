@@ -47,6 +47,23 @@ export interface User {
   updated_at: string | null;
 }
 
+/** A user as returned by the /admin endpoints, with moderation metadata. */
+export interface AdminUser extends User {
+  banned_until: string | null;
+  ban_reason: string | null;
+  banned_at: string | null;
+  banned_by_id: number | null;
+  must_change_password: boolean;
+}
+
+/** Returned exactly once by POST /admin/users/{id}/reset-password. */
+export interface TempPasswordResult {
+  user_id: number;
+  email: string;
+  temp_password: string;
+  must_change_password: boolean;
+}
+
 export interface UserPublicProfile {
   id: number;
   email: string;
