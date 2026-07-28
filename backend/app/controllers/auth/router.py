@@ -1,4 +1,3 @@
-import re
 import logging
 from datetime import timedelta
 
@@ -15,14 +14,13 @@ from .helpers import (
     get_password_hash,
     verify_password,
     create_access_token,
+    clear_expired_ban,
+    EDU_EMAIL_RE,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from app.utils.metrics import AUTH_ATTEMPTS
 
 logger = logging.getLogger(__name__)
-
-# Compiled regex: must be a valid email at a .edu domain
-_EDU_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.edu$", re.IGNORECASE)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,7 +28,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # Validate .edu email with proper regex
-    if not _EDU_EMAIL_RE.match(user.email):
+    if not EDU_EMAIL_RE.match(user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must use a valid university email address (.edu)",
@@ -76,7 +74,8 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user is banned
+    # Check if user is banned (lifting the ban first if it has expired)
+    clear_expired_ban(user, db)
     if not user.is_active:
         AUTH_ATTEMPTS.labels(method="login", status="failure").inc()
         raise HTTPException(

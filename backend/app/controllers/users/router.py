@@ -1,15 +1,14 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.orm import Session
 
 from app.models import User, Tag
-from app.models.enums import UserRole
 from app.models.resource import Resource
 from app.database import get_db
 from app.controllers.auth.schemas import UserSchema, UserUpdate, UserPublicProfile
-from app.controllers.auth.helpers import get_current_user, get_password_hash, require_role
+from app.controllers.auth.helpers import get_current_user, get_password_hash
 from app.controllers.tags.schemas import TagSchema
 from app.config import settings
 
@@ -36,6 +35,7 @@ def update_my_profile(
         current_user.full_name = updates.full_name.strip()
     if updates.password is not None:
         current_user.hashed_password = get_password_hash(updates.password)
+        current_user.must_change_password = False
 
     db.commit()
     db.refresh(current_user)
@@ -132,62 +132,5 @@ def get_user_profile(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 
-
-# ── Admin: ban/unban ──────────────────────────────────────────
-
-
-@router.patch("/{user_id}/ban", response_model=UserSchema)
-def toggle_user_ban(
-    user_id: int,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
-    db: Session = Depends(get_db),
-):
-    if user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot ban yourself",
-        )
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    # Cannot ban someone with equal or higher role
-    if user.role >= current_user.role:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot ban a user with equal or higher role",
-        )
-
-    user.is_active = not user.is_active
-    db.commit()
-    db.refresh(user)
-    logger.info(f"User {user_id} {'unbanned' if user.is_active else 'banned'} by {current_user.id}")
-    return user
-
-
-# ── Admin: change role ────────────────────────────────────────
-
-
-@router.patch("/{user_id}/role", response_model=UserSchema)
-def change_user_role(
-    user_id: int,
-    new_role: int = Query(..., ge=0, le=3),
-    current_user: User = Depends(require_role(UserRole.SUPERADMIN)),
-    db: Session = Depends(get_db),
-):
-    if user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change your own role",
-        )
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    user.role = new_role
-    db.commit()
-    db.refresh(user)
-    logger.info(f"User {user_id} role changed to {new_role} by {current_user.id}")
-    return user
+# Ban/restore, password reset and role changes live in the admin domain:
+# see app/controllers/admin/router.py (/admin/users/...).
