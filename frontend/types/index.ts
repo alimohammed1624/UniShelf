@@ -12,6 +12,18 @@ export interface Tag {
   category: string;
 }
 
+export interface TagSuggestion {
+  id: number;
+  name: string;
+  reason: string;
+}
+
+export interface TagSuggestionsResponse {
+  suggestions: TagSuggestion[];
+  // How the backend produced the list: llm / cache / popular / fallback / disabled
+  source: string;
+}
+
 // ── Resource types ───────────────────────────────────────────
 
 export interface Resource {

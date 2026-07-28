@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { AxiosError } from 'axios';
-import { Tag, TagBrief } from '@/types';
+import { Tag, TagBrief, TagSuggestion, TagSuggestionsResponse } from '@/types';
 import api from '@/lib/api';
 import { extractErrorMessage } from '@/lib/apiUtils';
 
@@ -8,12 +8,24 @@ interface TagState {
   items: Tag[];
   loading: boolean;
   error: string | null;
+  suggestions: TagSuggestion[];
+  suggestionsLoading: boolean;
+  suggestionsError: string | null;
+  suggestionsSource: string | null;
+  // Tracks the newest in-flight request so a slow response can't overwrite a
+  // newer one — see the guards in extraReducers.
+  suggestionsRequestId: string | null;
 }
 
 const initialState: TagState = {
   items: [],
   loading: false,
   error: null,
+  suggestions: [],
+  suggestionsLoading: false,
+  suggestionsError: null,
+  suggestionsSource: null,
+  suggestionsRequestId: null,
 };
 
 export const fetchTags = createAsyncThunk<Tag[], void, { rejectValue: string }>(
@@ -25,6 +37,27 @@ export const fetchTags = createAsyncThunk<Tag[], void, { rejectValue: string }>(
     } catch (err) {
       const error = err as AxiosError<{ detail: unknown }>;
       return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch tags'));
+    }
+  }
+);
+
+export const fetchTagSuggestions = createAsyncThunk<
+  TagSuggestionsResponse,
+  { query: string; selectedTags: string[] },
+  { rejectValue: string }
+>(
+  'tags/fetchSuggestions',
+  async ({ query, selectedTags }, { rejectWithValue }) => {
+    try {
+      const response = await api.post<TagSuggestionsResponse>('/tags/suggestions', {
+        query,
+        selected_tags: selectedTags,
+        limit: 3,
+      });
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to load suggestions'));
     }
   }
 );
@@ -88,7 +121,26 @@ const tagSlice = createSlice({
       .addCase(fetchTags.fulfilled, (state, action) => { state.loading = false; state.items = action.payload; })
       .addCase(fetchTags.rejected, (state, action) => { state.loading = false; state.error = action.payload || 'Failed to fetch tags'; })
       .addCase(createTag.fulfilled, (state, action) => { state.items.push(action.payload); })
-      .addCase(createTag.rejected, (state, action) => { state.error = action.payload || 'Failed to create tag'; });
+      .addCase(createTag.rejected, (state, action) => { state.error = action.payload || 'Failed to create tag'; })
+      .addCase(fetchTagSuggestions.pending, (state, action) => {
+        state.suggestionsLoading = true;
+        state.suggestionsError = null;
+        state.suggestionsRequestId = action.meta.requestId;
+      })
+      // Debounced typing can leave two requests in flight; ignore any that
+      // isn't the newest, or a slow response repaints a stale query's results.
+      .addCase(fetchTagSuggestions.fulfilled, (state, action) => {
+        if (state.suggestionsRequestId !== action.meta.requestId) return;
+        state.suggestionsLoading = false;
+        state.suggestions = action.payload.suggestions;
+        state.suggestionsSource = action.payload.source;
+      })
+      .addCase(fetchTagSuggestions.rejected, (state, action) => {
+        if (state.suggestionsRequestId !== action.meta.requestId) return;
+        state.suggestionsLoading = false;
+        state.suggestions = [];
+        state.suggestionsError = action.payload || 'Failed to load suggestions';
+      });
   },
 });
 

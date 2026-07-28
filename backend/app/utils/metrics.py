@@ -43,3 +43,22 @@ MINIO_OP_DURATION = Histogram(
     "MinIO operation latency",
     ["operation"],  # upload / download / delete
 )
+
+# ── Gemini / AI suggestion metrics ────────────────────────────
+
+GEMINI_REQUESTS = Counter(
+    "unishelf_gemini_requests_total",
+    "Calls to the Gemini API",
+    ["status"],  # success / timeout / http_error / parse_error / disabled
+)
+
+GEMINI_DURATION = Histogram(
+    "unishelf_gemini_request_seconds",
+    "Gemini API latency",
+)
+
+TAG_SUGGESTIONS = Counter(
+    "unishelf_tag_suggestions_total",
+    "Tag suggestion requests by how they were served",
+    ["source"],  # llm / cache / popular / fallback / disabled
+)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,8 @@ interface AdvancedFiltersProps {
   selectedTags?: string[];
   onTagToggle?: (tag: string) => void;
   onClearTags?: () => void;
+  suggestedTags?: { id: number; name: string; reason?: string }[];
+  suggestionsLoading?: boolean;
 }
 
 const RESOURCE_TYPES = [
@@ -36,6 +38,8 @@ export function AdvancedFilters({
   selectedTags = [],
   onTagToggle,
   onClearTags,
+  suggestedTags = [],
+  suggestionsLoading = false,
 }: AdvancedFiltersProps) {
   const [tagQuery, setTagQuery] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -75,6 +79,11 @@ export function AdvancedFilters({
     : [];
   const dateFilterLabel = formatDateRange(filters.dateRange);
 
+  // The backend already excludes selected tags, but a response that resolved
+  // just before a chip was clicked can still contain one.
+  const visibleSuggestions = suggestedTags.filter((tag) => !selectedTags.includes(tag.name));
+  const showSuggestions = suggestionsLoading || visibleSuggestions.length > 0;
+
   const selectTag = (tagName: string) => {
     onTagToggle?.(tagName);
     setTagQuery('');
@@ -84,7 +93,7 @@ export function AdvancedFilters({
     <Card className="h-fit sticky top-4">
       <CardContent className="space-y-4">
         {/* Tags */}
-        {allTags.length > 0 && (
+        {(allTags.length > 0 || showSuggestions) && (
           <FilterSection
             title="Tags"
             isActive={selectedTags.length > 0}
@@ -107,6 +116,57 @@ export function AdvancedFilters({
                       <span className="sr-only">Remove {tagName}</span>
                     </Button>
                   ))}
+                </div>
+              )}
+
+              {showSuggestions && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles
+                      className="size-3 text-purple-600 dark:text-purple-300"
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                      Suggested for you
+                    </span>
+                  </div>
+
+                  {suggestionsLoading ? (
+                    <div className="flex flex-wrap gap-2" aria-hidden="true">
+                      {['w-16', 'w-24', 'w-20'].map((width) => (
+                        <div
+                          key={width}
+                          className={`h-7 ${width} animate-pulse rounded-full bg-gradient-to-r from-purple-500/15 to-fuchsia-500/15 dark:from-purple-400/15 dark:to-fuchsia-400/15`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {visibleSuggestions.map((tag) => (
+                        // A raw button, not <Button>: the outline variant paints a solid
+                        // bg-background behind the gradient and ghost's hover:bg-accent
+                        // fights the hover gradient. Same approach as the options below.
+                        <button
+                          key={tag.id}
+                          type="button"
+                          // title alone would become the accessible name, and the
+                          // model often gives several chips the same reason — so
+                          // name them explicitly and keep the reason as a tooltip.
+                          title={tag.reason || `Add ${tag.name} filter`}
+                          aria-label={
+                            tag.reason
+                              ? `Add ${tag.name} filter — ${tag.reason}`
+                              : `Add ${tag.name} filter`
+                          }
+                          onClick={() => selectTag(tag.name)}
+                          className="inline-flex h-7 items-center gap-1 rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-fuchsia-500/10 px-3 text-xs font-medium text-purple-700 transition-colors hover:border-purple-500/50 hover:from-purple-500/20 hover:to-fuchsia-500/20 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-purple-500/40 dark:border-purple-400/30 dark:from-purple-400/15 dark:to-fuchsia-400/15 dark:text-purple-200 dark:hover:border-purple-400/50 dark:hover:from-purple-400/25 dark:hover:to-fuchsia-400/25"
+                        >
+                          {tag.name}
+                          <Plus className="size-3" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

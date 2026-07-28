@@ -14,6 +14,7 @@ import {
 } from '@/lib/features/resources/resourceSlice';
 import {
   fetchTags,
+  fetchTagSuggestions,
   createTag,
   assignTagsToResource,
   removeTagFromResource,
@@ -92,7 +93,11 @@ function SearchPageContent() {
   const dispatch = useAppDispatch();
   const { items: resources, loading } = useAppSelector((state) => state.resources);
   const { user } = useAppSelector((state) => state.auth);
-  const { items: allTags } = useAppSelector((state) => state.tags);
+  const {
+    items: allTags,
+    suggestions: suggestedTags,
+    suggestionsLoading,
+  } = useAppSelector((state) => state.tags);
   const bookmarkedResourceIds = useAppSelector((state) => state.bookmarks.ids);
 
   // If we restored from sessionStorage (URL had no params), push state into the URL so
@@ -112,6 +117,20 @@ function SearchPageContent() {
   useEffect(() => {
     if (allTags.length === 0) dispatch(fetchTags());
   }, [dispatch, allTags.length]);
+
+  // AI tag suggestions. Debounced on the query because each miss costs an
+  // upstream API call; the initial (empty-query) load fires immediately.
+  // selectedTags is a dependency so picking a chip re-ranks the next round.
+  useEffect(() => {
+    const query = advancedFilters.searchQuery.trim();
+    if (query.length > 0 && query.length < 3) return; // too little signal to pay for
+
+    const handle = setTimeout(() => {
+      dispatch(fetchTagSuggestions({ query, selectedTags }));
+    }, query ? 600 : 0);
+
+    return () => clearTimeout(handle);
+  }, [dispatch, advancedFilters.searchQuery, selectedTags]);
 
   useEffect(() => {
     const uniqueIds = [
@@ -327,6 +346,8 @@ function SearchPageContent() {
           selectedTags={selectedTags}
           onTagToggle={handleTagToggle}
           onClearTags={handleClearTags}
+          suggestedTags={suggestedTags}
+          suggestionsLoading={suggestionsLoading}
         />
       </div>
 
