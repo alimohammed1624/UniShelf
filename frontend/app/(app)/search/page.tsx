@@ -205,7 +205,11 @@ function SearchPageContent() {
     }
 
     if (advancedFilters.dateRange) {
-      const resourceDate = new Date(r.created_at).toISOString().split('T')[0];
+      // Compare against the user's local calendar date. `toISOString()` converts
+      // the timestamp to UTC first, which can move resources created near
+      // midnight into the previous day (for example, July 14 in India becomes
+      // July 13 in UTC).
+      const resourceDate = getLocalDateKey(r.created_at);
       const fromDate = advancedFilters.dateRange.from;
       const toDate = advancedFilters.dateRange.to;
       if (fromDate && resourceDate < fromDate) return false;
@@ -214,6 +218,13 @@ function SearchPageContent() {
 
     return true;
   });
+
+  function getLocalDateKey(timestamp: string) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
 
   const handleFilterChange = (filters: AdvancedFilterState) => {
     setAdvancedFilters(filters);
