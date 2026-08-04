@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Report, Resource, User
 from app.models.enums import UserRole, ReportStatus, ArchiveKind
@@ -53,7 +54,17 @@ def submit_report(
         status=int(ReportStatus.OPEN)
     )
     db.add(new_report)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost the race against a concurrent submit — same answer as the check above.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already reported this resource"
+        )
+
     db.refresh(new_report)
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {report_data.resource_id}")
