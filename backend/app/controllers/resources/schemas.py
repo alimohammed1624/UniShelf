@@ -33,6 +33,10 @@ class ResourceSchema(BaseModel):
     uploader_id: int
     owner_id: int
     is_archived: bool
+    archived_at: Optional[datetime] = None
+    archived_by_id: Optional[int] = None
+    archive_reason: Optional[str] = None
+    archive_kind: Optional[int] = None  # 0 = SELF, 1 = MODERATION
     last_accessed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None

@@ -7,12 +7,14 @@ import { assignTagsToResource, removeTagFromResource } from '../tags/tagSlice';
 
 interface ResourceState {
   items: Resource[];
+  archivedItems: Resource[];
   loading: boolean;
   error: string | null;
 }
 
 const initialState: ResourceState = {
   items: [],
+  archivedItems: [],
   loading: false,
   error: null,
 };
@@ -95,6 +97,44 @@ export const deleteResource = createAsyncThunk<number, number, { rejectValue: st
     } catch (err) {
       const error = err as AxiosError<{ detail: unknown }>;
       return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Delete failed'));
+    }
+  }
+);
+
+/**
+ * The caller's own archived resources, kept in `archivedItems` rather than
+ * `items`. `items` is shared with search and bookmarks, which fetch it only when
+ * it is empty — dropping archived rows in there would surface them on pages that
+ * are supposed to show live resources only.
+ */
+export const fetchMyArchivedResources = createAsyncThunk<Resource[], void, { rejectValue: string }>(
+  'resources/fetchMyArchived',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get<Resource[]>('/resources?include_archived=true&limit=200');
+      // The endpoint returns active rows alongside archived ones; this slice only wants the latter.
+      return response.data.filter((r) => r.is_archived);
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to fetch archived resources'));
+    }
+  }
+);
+
+/**
+ * Lift an archive. The backend decides whether the caller is allowed to —
+ * owners may only restore their own SELF archives, moderation takedowns
+ * require moderator+ — so a rejection here is a policy answer, not a bug.
+ */
+export const restoreResource = createAsyncThunk<Resource, number, { rejectValue: string }>(
+  'resources/restore',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await api.post<Resource>(`/resources/${id}/restore`);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Restore failed'));
     }
   }
 );
@@ -193,6 +233,29 @@ const resourceSlice = createSlice({
       })
       .addCase(deleteResource.rejected, (state, action) => {
         state.error = action.payload || 'Delete failed';
+      })
+      // Archived listing
+      .addCase(fetchMyArchivedResources.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyArchivedResources.fulfilled, (state, action) => {
+        state.loading = false;
+        state.archivedItems = action.payload;
+      })
+      .addCase(fetchMyArchivedResources.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to fetch archived resources';
+      })
+      // Restore
+      .addCase(restoreResource.fulfilled, (state, action) => {
+        const index = state.items.findIndex((r) => r.id === action.payload.id);
+        if (index !== -1) state.items[index] = action.payload;
+        // No longer archived, so it leaves the archived listing.
+        state.archivedItems = state.archivedItems.filter((r) => r.id !== action.payload.id);
+      })
+      .addCase(restoreResource.rejected, (state, action) => {
+        state.error = action.payload || 'Restore failed';
       })
       // Change file
       .addCase(changeResourceFile.fulfilled, (state, action) => {

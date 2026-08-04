@@ -41,11 +41,27 @@ export interface Resource {
   uploader_id: number;
   owner_id: number;
   is_archived: boolean;
+  archived_at: string | null;
+  archived_by_id: number | null;
+  archive_reason: string | null;
+  archive_kind: ArchiveKind | null;
   last_accessed_at: string | null;
   created_at: string;
   updated_at: string | null;
   tags: TagBrief[];
 }
+
+/**
+ * Why a resource was archived. SELF archives are the owner's own housekeeping
+ * and the owner may restore them; MODERATION archives are takedowns that only
+ * a moderator+ may lift.
+ */
+export const ArchiveKind = {
+  SELF: 0,
+  MODERATION: 1,
+} as const;
+
+export type ArchiveKind = (typeof ArchiveKind)[keyof typeof ArchiveKind];
 
 // ── User types ───────────────────────────────────────────────
 

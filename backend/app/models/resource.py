@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, BigInteger, String, Boolean, DateTime, func
+from sqlalchemy import Column, ForeignKey, Integer, BigInteger, String, Boolean, DateTime, Index, func
 from sqlalchemy.types import UserDefinedType
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -55,6 +55,16 @@ class Resource(Base):
     last_accessed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
+
+    # Archival metadata. `is_archived` stays the single source of truth for
+    # "hidden from every non-admin query"; these columns record why and by whom,
+    # and are cleared on restore. Mirrors the ban metadata on User.
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archived_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    archive_reason = Column(String(500), nullable=True)
+    archive_kind = Column(Integer, nullable=True)  # ArchiveKind; null when not archived
+
+    __table_args__ = (Index("ix_resources_archive_kind", "archive_kind"),)
 
     # Relationships
     uploader = relationship("User", back_populates="resources", foreign_keys=[uploader_id])
