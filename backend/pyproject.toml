@@ -12,6 +12,8 @@ dependencies = [
     "passlib[bcrypt]",
     "bcrypt==4.0.1",
     "minio",
+    "pillow",
+    "pymupdf",
     "pydantic-settings>=2.12.0",
     "email-validator",
     "prometheus-client",

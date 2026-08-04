@@ -4,6 +4,9 @@ ENV PYTHONUNBUFFERED=1
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# PyMuPDF's musllinux wheel links against libstdc++ at runtime
+RUN apk add --no-cache libstdc++
+
 WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1
