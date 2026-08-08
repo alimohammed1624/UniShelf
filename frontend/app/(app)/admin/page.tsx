@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchUsers, fetchResources, deleteResource } from '@/lib/features/admin/adminSlice';
+import { restoreResource } from '@/lib/features/resources/resourceSlice';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,9 +23,65 @@ import { UserActions } from '@/components/admin/user-actions';
 import { UserStatusBadge } from '@/components/admin/user-status-badge';
 import { getRoleLabel, ROLE_OPTIONS } from '@/lib/roles';
 import { toast } from 'sonner';
+import { ArchiveKind, type Resource } from '@/types';
 
 function getVisibilityBadge(isPublic: boolean) {
   return isPublic ? 'Public' : 'Private';
+}
+
+/**
+ * How an archive presents in the table. A moderation takedown and an owner's
+ * own housekeeping both hide a resource, but only one of them is a judgement
+ * call — an admin weighing up whether to reverse it needs to see which.
+ */
+function getArchiveBadge(kind: ArchiveKind | null): { label: string; className: string } {
+  if (kind === ArchiveKind.MODERATION) {
+    return { label: 'Takedown', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
+  }
+  if (kind === ArchiveKind.SELF) {
+    return { label: 'Self-archived', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+  }
+  return { label: 'Archived', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400' };
+}
+
+/** The "Archived" cell: what kind of archive it is, when it happened, by whom and why. */
+function ArchivedCell({
+  resource,
+  userMap,
+}: {
+  resource: Resource;
+  userMap: Map<number, { full_name: string; email: string }>;
+}) {
+  if (!resource.is_archived) return <span className="text-muted-foreground">—</span>;
+
+  const badge = getArchiveBadge(resource.archive_kind);
+
+  return (
+    <div className="space-y-1">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge.className}`}>
+        {badge.label}
+      </span>
+      {(resource.archived_at || resource.archived_by_id !== null) && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+          {resource.archived_at && <span>{new Date(resource.archived_at).toLocaleDateString()}</span>}
+          {resource.archived_by_id !== null && (
+            <>
+              <span>by</span>
+              <UserLabel
+                userId={resource.archived_by_id}
+                preloaded={userMap.get(resource.archived_by_id)}
+              />
+            </>
+          )}
+        </div>
+      )}
+      {resource.archive_reason && (
+        <div className="text-xs text-muted-foreground max-w-[200px] truncate" title={resource.archive_reason}>
+          {resource.archive_reason}
+        </div>
+      )}
+    </div>
+  );
 }
 
 type Section = 'overview' | 'users' | 'resources';
@@ -183,6 +240,12 @@ function ResourcesPanel() {
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [restoreConfirmId, setRestoreConfirmId] = useState<number | null>(null);
+
+  // Lifting an archive is recoverable, so any admin who can reach this page may
+  // do it. Deleting is a hard delete of the row and the file — superadmin only.
+  const canRestore = userRole >= 2;
+  const canDelete = userRole === 3;
 
   // Build a quick lookup: userId → { full_name, email }
   const userMap = new Map(users.map((u) => [u.id, { full_name: u.full_name, email: u.email }]));
@@ -213,6 +276,22 @@ function ResourcesPanel() {
     });
     await promise;
     setDeleteConfirmId(null);
+  };
+
+  const handleRestore = async (resourceId: number) => {
+    try {
+      await dispatch(restoreResource(resourceId)).unwrap();
+      toast.success('Resource restored');
+      // restoreResource updates the resources slice, which this panel does not
+      // read — refetch so the row leaves the archived view.
+      dispatch(fetchResources({ includeArchived: true }));
+    } catch (err) {
+      // A 403 (not yours to lift) or 409 (parent still archived) carries the
+      // backend's explanation; show it verbatim rather than a generic failure.
+      toast.error(String(err));
+    } finally {
+      setRestoreConfirmId(null);
+    }
   };
 
   if (loading && resources.length === 0) return <p className="text-muted-foreground">Loading...</p>;
@@ -271,6 +350,22 @@ function ResourcesPanel() {
         </div>
       )}
 
+      {/* Restore confirmation dialog */}
+      {restoreConfirmId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Restore Resource?</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              This lifts the archive and puts the resource back in front of its audience. It can be archived again at any time.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRestoreConfirmId(null)}>Cancel</Button>
+              <Button onClick={() => restoreConfirmId !== null && handleRestore(restoreConfirmId)}>Restore</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
@@ -280,15 +375,13 @@ function ResourcesPanel() {
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Visibility</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Uploaded</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Archived</th>
-            {userRole === 3 && (
-              <th className="text-left py-2 font-medium text-muted-foreground">Actions</th>
-            )}
+            <th className="text-left py-2 font-medium text-muted-foreground">Actions</th>
           </tr>
         </thead>
         <tbody>
           {filteredResources.length === 0 ? (
             <tr>
-              <td colSpan={userRole === 3 ? 7 : 6} className="py-8 text-center text-sm text-muted-foreground">
+              <td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                 {emptyMessage()}
               </td>
             </tr>
@@ -309,18 +402,19 @@ function ResourcesPanel() {
                 </span>
               </td>
               <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{new Date(resource.created_at).toLocaleDateString()}</td>
-              <td className="py-2 pr-4">
-                {resource.is_archived ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Archived</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+              <td className="py-2 pr-4 align-top">
+                <ArchivedCell resource={resource} userMap={userMap} />
               </td>
-              {userRole === 3 && (
-                <td className="py-2 pr-4">
-                  <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmId(resource.id)}>Delete</Button>
-                </td>
-              )}
+              <td className="py-2 pr-4 align-top">
+                <div className="flex items-center gap-2">
+                  {canRestore && resource.is_archived && (
+                    <Button variant="outline" size="sm" onClick={() => setRestoreConfirmId(resource.id)}>Restore</Button>
+                  )}
+                  {canDelete && (
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmId(resource.id)}>Delete</Button>
+                  )}
+                </div>
+              </td>
             </tr>
           )))}
         </tbody>

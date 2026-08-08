@@ -3,11 +3,13 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Report, Resource, User
-from app.models.enums import UserRole, ReportStatus
+from app.models.enums import UserRole, ReportStatus, ArchiveKind
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
+from app.controllers.resources.schemas import ResourceSchema
 from .schemas import ReportCreate, ReportSchema, ResourceBrief
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,17 @@ def submit_report(
         status=int(ReportStatus.OPEN)
     )
     db.add(new_report)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost the race against a concurrent submit — same answer as the check above.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already reported this resource"
+        )
+
     db.refresh(new_report)
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {report_data.resource_id}")
@@ -106,12 +118,21 @@ def resolve_report(
             detail="Associated resource not found"
         )
 
-    # Archive the resource
+    now = datetime.now(timezone.utc)
+
+    # Archive the resource as a takedown. archive_reason is String(500) while
+    # Report.reason allows 2000, so it has to be cut down to fit.
     resource.is_archived = True
+    resource.archived_at = now
+    resource.archived_by_id = current_user.id
+    resource.archive_kind = int(ArchiveKind.MODERATION)
+    resource.archive_reason = (
+        report.reason if len(report.reason) <= 500 else report.reason[:497] + "..."
+    )
 
     # Mark report as resolved
     report.status = int(ReportStatus.RESOLVED)
-    report.resolved_at = datetime.now(timezone.utc)
+    report.resolved_at = now
 
     db.commit()
     db.refresh(report)
@@ -149,3 +170,32 @@ def dismiss_report(
 
     logger.info(f"Report {report_id} dismissed by moderator {current_user.id}")
     return report
+
+
+# ── Takedowns ─────────────────────────────────────────────────
+
+
+@router.get("/resources/archived", response_model=list[ResourceSchema])
+def list_archived_resources(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(require_role(UserRole.MODERATOR)),
+    db: Session = Depends(get_db),
+):
+    """
+    List resources taken down by moderation. Moderators only.
+
+    Backed by the resources themselves rather than resolved reports —
+    dismiss_report also resolves without archiving, so a report-derived
+    listing shows dismissed false alarms as takedowns.
+    """
+    query = (
+        db.query(Resource)
+        .options(selectinload(Resource.tags))
+        .filter(
+            Resource.is_archived == True,
+            Resource.archive_kind == int(ArchiveKind.MODERATION),
+        )
+        .order_by(Resource.archived_at.desc(), Resource.id.desc())
+    )
+    return query.offset(skip).limit(limit).all()

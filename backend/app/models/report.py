@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint, Index, func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Index, func, text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.enums import ReportStatus
@@ -17,7 +17,20 @@ class Report(Base):
     resolved_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("reported_by", "resource_id", name="uq_report_user_resource"),
+        # One *open* report per user per resource. A plain unique constraint on
+        # the pair outlived the report it was about: once the first report was
+        # resolved or dismissed, submit_report's own duplicate check (which is
+        # scoped to OPEN) let the insert through and the constraint turned it
+        # into a 500. Reporting a resource again after the last one is closed is
+        # legitimate — a dismissed report does not archive, and a takedown can be
+        # restored — so the index carries the same status scope as the check.
+        Index(
+            "uq_report_open_per_user_resource",
+            "reported_by",
+            "resource_id",
+            unique=True,
+            postgresql_where=text(f"status = {int(ReportStatus.OPEN)}"),
+        ),
         Index("ix_reports_status", "status"),
         Index("ix_reports_resource_id", "resource_id"),
     )

@@ -1,8 +1,8 @@
 import re
 import logging
-from typing import List, Optional
+from typing import Callable, List, Optional
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Body, status
 from fastapi.responses import StreamingResponse
@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func as sa_func
 
 from app.models import Resource, User, Tag, Visibility, Report
-from app.models.enums import UserRole, AccessType, ReportStatus
+from app.models.enums import UserRole, AccessType, ReportStatus, ArchiveKind
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
 from app.utils.minio_client import upload_file, stream_download, delete_file, get_minio_client
@@ -209,13 +209,24 @@ def list_resources(
     tags: Optional[str] = Query(None, max_length=500),
     hierarchy: Optional[str] = Query(None, max_length=200),
     uploader_id: Optional[int] = Query(None, ge=1),
+    include_archived: bool = Query(False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = (
-        active_resources(db)
-        .options(selectinload(Resource.tags))
-    )
+    query = db.query(Resource).options(selectinload(Resource.tags))
+
+    if not include_archived:
+        query = query.filter(Resource.is_archived == False)
+    elif current_user.role < int(UserRole.ADMIN):
+        # Archived rows are surfaced so an owner can find and restore their own.
+        # The visibility filter below still admits other people's public resources,
+        # so scope the archived ones to the caller — opting in must not turn a
+        # takedown into something the whole university can read.
+        query = query.filter(
+            (Resource.is_archived == False)
+            | (Resource.owner_id == current_user.id)
+            | (Resource.uploader_id == current_user.id)
+        )
 
     # ── Visibility filtering ──
     # Get IDs of resources where user is blacklisted
@@ -397,6 +408,82 @@ async def replace_resource_file(
 # ── Soft delete ───────────────────────────────────────────────
 
 
+# Hierarchy depth is capped at 10 levels (see validate_hierarchy), and
+# get_resource_parents bounds its upward walk the same way. A subtree walk that
+# runs deeper than this is a parent_id cycle, not a real tree.
+MAX_SUBTREE_DEPTH = 10
+
+
+def _collect_descendants(
+    db: Session,
+    resource_id: int,
+    prune: Optional[Callable[[Resource], bool]] = None,
+    max_depth: int = MAX_SUBTREE_DEPTH,
+) -> List[Resource]:
+    """
+    Breadth-first walk of everything below a resource, archived rows included.
+
+    Walks parent_id rather than the hierarchy ltree column: parent_id is the
+    reliable structural link, while hierarchy is a label path children do not
+    always inherit. A visited set plus the depth bound keep a cycle in parent_id
+    from spinning forever.
+
+    When `prune` returns True for a child, that child is left out of the result
+    and its own subtree is not walked.
+    """
+    descendants: List[Resource] = []
+    seen = {resource_id}
+    frontier = [resource_id]
+    depth = 0
+
+    while frontier and depth < max_depth:
+        children = (
+            db.query(Resource)
+            .filter(Resource.parent_id.in_(frontier))
+            .order_by(Resource.id.asc())
+            .all()
+        )
+        frontier = []
+        for child in children:
+            if child.id in seen:
+                continue
+            seen.add(child.id)
+            if prune is not None and prune(child):
+                continue
+            descendants.append(child)
+            frontier.append(child.id)
+        depth += 1
+
+    return descendants
+
+
+def _stamp_self_archive(resource: Resource, user: User, when: datetime) -> None:
+    """Archive a resource as the owner's own housekeeping (reversible by the owner)."""
+    resource.is_archived = True
+    resource.archived_at = when
+    resource.archived_by_id = user.id
+    resource.archive_kind = int(ArchiveKind.SELF)
+    resource.archive_reason = None
+
+
+def _clear_archive(resource: Resource) -> None:
+    """Lift an archive and drop the metadata that explained it."""
+    resource.is_archived = False
+    resource.archived_at = None
+    resource.archived_by_id = None
+    resource.archive_reason = None
+    resource.archive_kind = None
+
+
+def _blocks_restore(resource: Resource) -> bool:
+    """
+    True if a descendant must stay archived while an ancestor is restored — a
+    moderation takedown, or an archive this flow did not create. Its subtree is
+    held down with it, so nothing is ever restored under a still-archived parent.
+    """
+    return resource.is_archived and resource.archive_kind != int(ArchiveKind.SELF)
+
+
 @router.delete("/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_resource(
     resource_id: int,
@@ -406,8 +493,83 @@ def delete_resource(
     resource = get_resource_or_404(db, resource_id)
     require_resource_owner(resource, current_user)
 
-    resource.is_archived = True
+    now = datetime.now(timezone.utc)
+    _stamp_self_archive(resource, current_user, now)
+
+    # Archive the whole subtree. Leaving children active under an archived parent
+    # breaks their breadcrumbs, since get_resource_parents stops at the first
+    # archived ancestor. Descendants already archived keep their own metadata, so
+    # a moderation takedown underneath is never overwritten.
+    cascaded = 0
+    for descendant in _collect_descendants(db, resource_id):
+        if descendant.is_archived:
+            continue
+        _stamp_self_archive(descendant, current_user, now)
+        cascaded += 1
+
     db.commit()
+    logger.info(
+        f"Resource {resource_id} archived by user {current_user.id} "
+        f"({cascaded} descendant(s) cascaded)"
+    )
+
+
+# ── Restore (undo soft delete) ────────────────────────────────
+
+
+@router.post("/{resource_id}/restore", response_model=ResourceSchema)
+def restore_resource(
+    resource_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lift a soft delete on a resource and its self-archived subtree. Idempotent."""
+    resource = get_resource_or_404(db, resource_id, include_archived=True)
+
+    if not resource.is_archived:
+        require_resource_owner(resource, current_user)
+        return resource
+
+    # Who may lift an archive depends on why it was made, so the kind is checked
+    # before ownership. require_resource_owner allows owner-or-admin, and a
+    # moderator is *below* admin — gating on it first would lock moderators out
+    # of the takedowns that are theirs to reverse.
+    if resource.archive_kind == int(ArchiveKind.MODERATION):
+        if current_user.role < int(UserRole.MODERATOR):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This resource was removed by moderation and can only be restored by a moderator",
+            )
+    else:
+        require_resource_owner(resource, current_user)
+
+    # Restoring under an archived parent would resurrect an unreachable resource.
+    if resource.parent_id is not None:
+        parent = db.query(Resource).filter(Resource.id == resource.parent_id).first()
+        if parent is not None and parent.is_archived:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Parent resource is archived — restore the parent first",
+            )
+
+    _clear_archive(resource)
+
+    # Cascade down over self-archived descendants only. A moderation takedown in
+    # the subtree stays down, and so does everything beneath it, so restoring a
+    # directory can never silently undo one.
+    restored = 0
+    for descendant in _collect_descendants(db, resource_id, prune=_blocks_restore):
+        if descendant.is_archived:
+            _clear_archive(descendant)
+            restored += 1
+
+    db.commit()
+    db.refresh(resource)
+    logger.info(
+        f"Resource {resource_id} restored by user {current_user.id} "
+        f"({restored} descendant(s) cascaded)"
+    )
+    return resource
 
 
 # ── Download (streaming) ─────────────────────────────────────
