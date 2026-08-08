@@ -27,7 +27,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Bookmark, BookmarkCheck, List, Grid3x3, File as FileIcon } from 'lucide-react';
+import {
+  Bookmark,
+  BookmarkCheck,
+  List,
+  Grid3x3,
+  File as FileIcon,
+  FileCode,
+  FileImage,
+  FileText,
+  Film,
+  Folder,
+  Link2,
+} from 'lucide-react';
 import api from '@/lib/api';
 
 interface ResourceTableCardProps {
@@ -101,34 +113,57 @@ export function ResourceTableCard({
   // Thumbnail state
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
 
-  // Fetch thumbnails for grid view
+  // Stable identity for the resource set. Parents often pass a freshly
+  // filtered array, so depending on the array reference would refetch every
+  // render. Size is included so a replaced file busts the key.
+  const thumbnailKey = resources.map((r) => `${r.id}:${r.size ?? 0}`).join(',');
+
+  // Fetch thumbnails from the lazy backend endpoint. A 404 means "no
+  // thumbnail for this type" — expected, the icon fallback covers it.
   useEffect(() => {
-    if (viewMode !== 'grid') return;
+    let cancelled = false;
+    const urls: string[] = [];
 
     const fetchThumbnails = async () => {
-      const newThumbnails: Record<number, string> = {};
-      for (const resource of resources) {
-        if (resource.type?.startsWith('image/')) {
+      const entries = await Promise.all(
+        resources.map(async (resource) => {
+          if (resource.type === 'directory' || resource.type === 'link') return null;
           try {
-            const response = await api.get(`/resources/${resource.id}/download`, { responseType: 'blob' });
+            const response = await api.get(`/resources/${resource.id}/thumbnail`, { responseType: 'blob' });
             const url = URL.createObjectURL(response.data);
-            newThumbnails[resource.id] = url;
-          } catch (error) {
-            console.warn(`Failed to fetch thumbnail for resource ${resource.id}:`, error);
+            urls.push(url);
+            return [resource.id, url] as const;
+          } catch {
+            return null;
           }
-        }
-      }
-      setThumbnails(newThumbnails);
+        }),
+      );
+      if (cancelled) return;
+      setThumbnails(Object.fromEntries(entries.filter(Boolean) as (readonly [number, string])[]));
     };
 
     fetchThumbnails();
 
     // Cleanup function to revoke object URLs
     return () => {
-      Object.values(thumbnails).forEach((url: string) => URL.revokeObjectURL(url));
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
       setThumbnails({});
     };
-  }, [viewMode, resources]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thumbnailKey]);
+
+  // Icon fallback for resources without a renderable thumbnail
+  const typeIcon = (resource: Resource, className: string) => {
+    const type = resource.type ?? '';
+    if (type === 'directory') return <Folder className={className} />;
+    if (type === 'link') return <Link2 className={className} />;
+    if (type === 'application/pdf') return <FileText className={className} />;
+    if (type.startsWith('image/')) return <FileImage className={className} />;
+    if (type.startsWith('video/')) return <Film className={className} />;
+    if (type.startsWith('text/')) return <FileCode className={className} />;
+    return <FileIcon className={className} />;
+  };
 
   const openEditModal = (resource: Resource) => {
     setEditingResource(resource);
@@ -307,9 +342,18 @@ export function ResourceTableCard({
                 {resources.map((resource) => (
                   <TableRow key={resource.id}>
                     <TableCell className="font-medium">
-                      <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
-                        {resource.title}
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 shrink-0 bg-muted/50 rounded-md border border-border/50 flex items-center justify-center overflow-hidden">
+                          {thumbnails[resource.id] ? (
+                            <img src={thumbnails[resource.id]} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            typeIcon(resource, 'h-5 w-5 text-muted-foreground/60')
+                          )}
+                        </div>
+                        <Link href={`/resources/${resource.id}`} className="cursor-pointer hover:underline">
+                          {resource.title}
+                        </Link>
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-xs">{resource.filename ?? '—'}</TableCell>
                     <TableCell>
@@ -343,7 +387,7 @@ export function ResourceTableCard({
                     {thumbnails[resource.id] ? (
                       <img src={thumbnails[resource.id]} alt={resource.title} className="w-full h-full object-cover" />
                     ) : (
-                      <FileIcon className="h-10 w-10 text-muted-foreground/60" />
+                      typeIcon(resource, 'h-10 w-10 text-muted-foreground/60')
                     )}
                   </div>
 

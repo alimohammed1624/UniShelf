@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Body, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Body, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +14,21 @@ from app.models import Resource, User, Tag, Visibility, Report
 from app.models.enums import UserRole, AccessType, ReportStatus, ArchiveKind
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
-from app.utils.minio_client import upload_file, stream_download, delete_file, get_minio_client
+from app.utils.minio_client import (
+    upload_file,
+    upload_bytes,
+    stream_download,
+    download_file,
+    download_file_if_exists,
+    delete_file,
+    get_minio_client,
+)
+from app.utils.thumbnails import (
+    THUMBNAIL_CONTENT_TYPE,
+    generate_thumbnail,
+    supports_thumbnail,
+    thumbnail_object_key,
+)
 from app.utils.db_helpers import (
     active_resources,
     check_resource_access,
@@ -401,6 +415,12 @@ async def replace_resource_file(
         except Exception:
             logger.warning(f"Failed to delete old MinIO object {old_object_key}")
 
+    # Drop the cached thumbnail so it regenerates from the new file (best-effort)
+    try:
+        delete_file(thumbnail_object_key(resource.id))
+    except Exception:
+        logger.warning(f"Failed to delete cached thumbnail for resource {resource.id}")
+
     db.refresh(resource)
     return resource
 
@@ -608,6 +628,49 @@ def download_resource(
         chunk_generator,
         media_type=resource.type or "application/octet-stream",
         headers=headers,
+    )
+
+
+# ── Thumbnail (lazy-generated, cached in MinIO) ──────────────
+
+
+@router.get("/{resource_id}/thumbnail")
+async def get_resource_thumbnail(
+    resource_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return a small WebP preview of the resource (PDF first page or image).
+
+    Generated lazily on first request and cached in MinIO under
+    thumbnails/{id}.webp, so pre-existing resources get thumbnails the first
+    time anyone lists them. 404 means "no thumbnail for this type" — the
+    frontend falls back to a file-type icon.
+    """
+    resource = get_resource_or_404(db, resource_id)
+    require_resource_access(db, resource, current_user)
+
+    if not resource.file_path or not supports_thumbnail(resource.type):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No thumbnail available")
+
+    thumb_key = thumbnail_object_key(resource.id)
+    thumb = await download_file_if_exists(thumb_key)
+
+    if thumb is None:
+        # Cache miss: render from the source file. Whole-file read is bounded
+        # by MAX_UPLOAD_BYTES, same as the upload path. Concurrent first
+        # requests may both generate — harmless, the writes are idempotent.
+        source = await download_file(resource.file_path)
+        thumb = generate_thumbnail(source, resource.type)
+        if thumb is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No thumbnail available")
+        await upload_bytes(thumb, thumb_key, THUMBNAIL_CONTENT_TYPE)
+
+    return Response(
+        content=thumb,
+        media_type=THUMBNAIL_CONTENT_TYPE,
+        headers={"Cache-Control": "private, max-age=3600"},
     )
 
 

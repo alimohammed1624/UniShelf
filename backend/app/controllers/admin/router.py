@@ -19,6 +19,7 @@ from app.controllers.auth.helpers import (
 )
 from app.controllers.resources.schemas import ResourceSchema
 from app.utils.minio_client import delete_file
+from app.utils.thumbnails import thumbnail_object_key
 from .schemas import (
     AdminUserCreate,
     AdminUserSchema,
@@ -291,6 +292,12 @@ def hard_delete_resource(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Storage service unavailable — cannot complete deletion",
             )
+
+        # Cached thumbnail cleanup is best-effort — an orphan here is harmless
+        try:
+            delete_file(thumbnail_object_key(resource.id))
+        except Exception:
+            logger.warning(f"Failed to delete cached thumbnail for resource {resource.id}")
 
     db.delete(resource)
     db.commit()

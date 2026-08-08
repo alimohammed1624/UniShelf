@@ -100,6 +100,38 @@ async def upload_file(
         raise HTTPException(status_code=502, detail="Storage service unavailable")
 
 
+async def upload_bytes(
+    data: bytes, object_name: str, content_type: str, bucket_name: str = MINIO_BUCKET_NAME
+) -> str:
+    """
+    Upload raw bytes to MinIO bucket (e.g. generated thumbnails).
+
+    Returns:
+        The object key of the uploaded object
+    """
+    client = get_minio_client()
+
+    try:
+        with MINIO_OP_DURATION.labels(operation="upload").time():
+            client.put_object(
+                bucket_name,
+                object_name,
+                io.BytesIO(data),
+                length=len(data),
+                content_type=content_type,
+            )
+
+        logger.info(f"Uploaded object: {object_name} ({len(data)} bytes)")
+        return object_name
+
+    except S3Error as e:
+        logger.error(f"S3 error uploading object {object_name}: {e}")
+        raise HTTPException(status_code=502, detail="Storage service unavailable")
+    except Exception as e:
+        logger.error(f"Unexpected error uploading object {object_name}: {e}")
+        raise HTTPException(status_code=502, detail="Storage service unavailable")
+
+
 # ── Streaming download ────────────────────────────────────────
 
 
@@ -160,6 +192,35 @@ async def download_file(
     except Exception as e:
         logger.error(f"Unexpected error downloading file {object_name}: {e}")
         raise HTTPException(status_code=502, detail="Storage service unavailable")
+
+
+async def download_file_if_exists(
+    object_name: str, bucket_name: str = MINIO_BUCKET_NAME
+) -> bytes | None:
+    """
+    Download entire object into memory, or return None if it does not exist.
+    Use for cache lookups where a miss is expected, not an error.
+    """
+    client = get_minio_client()
+    response = None
+
+    try:
+        with MINIO_OP_DURATION.labels(operation="download").time():
+            response = client.get_object(bucket_name, object_name)
+            return response.read()
+
+    except S3Error as e:
+        if e.code == "NoSuchKey":
+            return None
+        logger.error(f"S3 error downloading object {object_name}: {e}")
+        raise HTTPException(status_code=502, detail="Storage service unavailable")
+    except Exception as e:
+        logger.error(f"Unexpected error downloading object {object_name}: {e}")
+        raise HTTPException(status_code=502, detail="Storage service unavailable")
+    finally:
+        if response is not None:
+            response.close()
+            response.release_conn()
 
 
 # ── Presigned URL ─────────────────────────────────────────────
