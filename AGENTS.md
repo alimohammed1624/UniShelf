@@ -59,6 +59,13 @@ Key notes:
 - Single `.env` at repo root (copied from `env.example`). Compose and both services read it.
 - `DEBUG=1` enables dev mode.
 - Default credentials after seeding: see README.md "Seeded accounts" table.
+- **There are no migrations.** Schema comes from `Base.metadata.create_all()` at import, which creates missing *tables* but never ALTERs existing ones. Postgres data lives in a **bind mount** (`./data/postgres`), so `docker compose down -v` does **not** reset it. After pulling a change that adds or alters a model column, either add the column by hand:
+  ```bash
+  docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+    -c 'ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type>;'
+  docker compose exec backend python seed_db.py --reset
+  ```
+  or wipe the data directory entirely (`docker compose down && rm -rf data/postgres`) before bringing the stack back up and reseeding.
 - To seed data into a running stack:
   ```bash
   docker compose exec backend python seed_db.py          # insert without clearing

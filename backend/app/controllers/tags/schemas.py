@@ -1,5 +1,5 @@
-from pydantic import BaseModel, field_validator
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional
 import re
 
 
@@ -83,3 +83,34 @@ class TagSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TagSuggestionRequest(BaseModel):
+    # The length caps bound both the cost and the prompt-injection blast radius
+    # of this input: without them a user can paste 100KB into the search box and
+    # we pay to send it upstream.
+    query: Optional[str] = Field(default="", max_length=200)
+    selected_tags: List[str] = Field(default_factory=list, max_length=20)
+    limit: int = Field(default=6, ge=1, le=10)
+
+    @field_validator("query")
+    @classmethod
+    def clean_query(cls, v: Optional[str]) -> str:
+        return (v or "").strip()
+
+    @field_validator("selected_tags")
+    @classmethod
+    def clean_selected_tags(cls, v: List[str]) -> List[str]:
+        return [t.strip().lower() for t in v if t and t.strip()]
+
+
+class TagSuggestion(BaseModel):
+    id: int
+    name: str
+    reason: str = ""
+
+
+class TagSuggestionsResponse(BaseModel):
+    suggestions: List[TagSuggestion]
+    # How the list was produced: llm / cache / popular / fallback / disabled
+    source: str
