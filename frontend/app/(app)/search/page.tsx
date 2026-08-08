@@ -217,7 +217,7 @@ function SearchPageContent() {
     }
 
     if (selectedTags.length > 0) {
-      const matchesTags = selectedTags.every((tagName) =>
+      const matchesTags = selectedTags.some((tagName) =>
         r.tags.some((t) => t.name.toLowerCase() === tagName.toLowerCase())
       );
       if (!matchesTags) return false;
