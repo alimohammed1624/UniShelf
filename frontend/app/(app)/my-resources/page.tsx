@@ -11,6 +11,8 @@ import {
   downloadResource,
   editResource,
   deleteResource,
+  restoreResource,
+  fetchMyArchivedResources,
   changeResourceFile,
 } from '@/lib/features/resources/resourceSlice';
 import {
@@ -19,11 +21,24 @@ import {
   assignTagsToResource,
   removeTagFromResource,
 } from '@/lib/features/tags/tagSlice';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ThemeSelect } from '@/components/admin/theme-select';
+import { ArchiveKind } from '@/types';
 import { toast } from 'sonner';
 
 export default function MyResourcesPage() {
   const dispatch = useAppDispatch();
-  const { items: resources, loading } = useAppSelector((state) => state.resources);
+  const { items: resources, archivedItems, loading } = useAppSelector((state) => state.resources);
   const { user } = useAppSelector((state) => state.auth);
   const { items: allTags } = useAppSelector((state) => state.tags);
 
@@ -33,12 +48,23 @@ export default function MyResourcesPage() {
   const [linkUrl, setLinkUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
+  const [restoringId, setRestoringId] = useState<number | null>(null);
+
   useEffect(() => {
     if (resources.length === 0) dispatch(fetchResources());
     if (allTags.length === 0) dispatch(fetchTags());
   }, [dispatch, resources.length, allTags.length]);
 
+  // Archived rows live outside the shared `items` list, so they need their own
+  // fetch. Re-run on every switch back so a just-archived resource shows up.
+  useEffect(() => {
+    if (statusFilter === 'archived') dispatch(fetchMyArchivedResources());
+  }, [dispatch, statusFilter]);
+
   const myResources = resources.filter((r) => r.owner_id === user?.id);
+  const activeResources = myResources.filter((r) => !r.is_archived);
+  const archivedResources = archivedItems.filter((r) => r.owner_id === user?.id);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,15 +129,30 @@ export default function MyResourcesPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  // DELETE /resources/{id} archives rather than destroys — the copy says so.
+  const handleArchive = async (id: number) => {
     try {
       const promise = dispatch(deleteResource(id)).unwrap();
-      toast.promise(promise, { loading: 'Deleting...', success: 'Resource deleted', error: 'Delete failed' });
+      toast.promise(promise, { loading: 'Archiving...', success: 'Resource archived', error: 'Archive failed' });
       await promise;
       return true;
     } catch {
       return false;
     }
+  };
+
+  // The backend decides whether this archive may be lifted (403 for moderation
+  // takedowns, 409 while the parent folder is still archived), so surface its message.
+  const handleRestore = async (id: number) => {
+    setRestoringId(id);
+    const promise = dispatch(restoreResource(id)).unwrap();
+    toast.promise(promise, {
+      loading: 'Restoring...',
+      success: 'Resource restored',
+      error: (err) => (typeof err === 'string' ? err : 'Restore failed'),
+    });
+    await promise.catch(() => {});
+    setRestoringId(null);
   };
 
   const handleChangeFile = async (id: number, newFile: File) => {
@@ -150,37 +191,128 @@ export default function MyResourcesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">My Resources</h1>
-      <ResourceUploadCard
-        title={title}
-        description={description}
-        file={file}
-        fileInputRef={fileInputRef}
-        linkUrl={linkUrl}
-        onTitleChange={setTitle}
-        onDescriptionChange={setDescription}
-        onFileChange={setFile}
-        onRemoveFile={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-        onLinkUrlChange={setLinkUrl}
-        onSubmitFile={handleUpload}
-        onSubmitLink={handleSubmitLink}
-      />
-      <ResourceTableCard
-        resources={myResources}
-        loading={loading}
-        currentUserId={user?.id ?? null}
-        currentUserRole={user?.role ?? 0}
-        allTags={allTags}
-        onDownload={handleDownload}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onChangeFile={handleChangeFile}
-        onCreateTag={handleCreateTag}
-        onAssignTags={handleAssignTags}
-        onRemoveTag={handleRemoveTag}
-        storageKey="viewMode:my-resources"
-        hideActions
-      />
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">My Resources</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Status:</label>
+          <ThemeSelect<'active' | 'archived'>
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'active', label: 'Active' },
+              { value: 'archived', label: `Archived${archivedResources.length > 0 ? ` (${archivedResources.length})` : ''}` },
+            ]}
+          />
+        </div>
+      </div>
+
+      {statusFilter === 'active' ? (
+        <>
+          <ResourceUploadCard
+            title={title}
+            description={description}
+            file={file}
+            fileInputRef={fileInputRef}
+            linkUrl={linkUrl}
+            onTitleChange={setTitle}
+            onDescriptionChange={setDescription}
+            onFileChange={setFile}
+            onRemoveFile={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+            onLinkUrlChange={setLinkUrl}
+            onSubmitFile={handleUpload}
+            onSubmitLink={handleSubmitLink}
+          />
+          <ResourceTableCard
+            resources={activeResources}
+            loading={loading}
+            currentUserId={user?.id ?? null}
+            currentUserRole={user?.role ?? 0}
+            allTags={allTags}
+            onDownload={handleDownload}
+            onEdit={handleEdit}
+            onDelete={handleArchive}
+            onChangeFile={handleChangeFile}
+            onCreateTag={handleCreateTag}
+            onAssignTags={handleAssignTags}
+            onRemoveTag={handleRemoveTag}
+            storageKey="viewMode:my-resources"
+            hideActions
+          />
+        </>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Archived Resources</CardTitle>
+            <CardDescription>
+              {loading ? 'Loading resources...' : `${archivedResources.length} archived`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {archivedResources.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nothing archived. Resources you archive stay here so you can restore them.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Filename</TableHead>
+                    <TableHead>Archived</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {archivedResources.map((resource) => {
+                    // A moderation takedown is only a moderator's to lift — the
+                    // backend answers 403, so don't offer the owner a dead button.
+                    const takenDown = resource.archive_kind === ArchiveKind.MODERATION;
+                    return (
+                      <TableRow key={resource.id}>
+                        {/* Not linked: archived resources 404 on the detail route. */}
+                        <TableCell className="font-medium">{resource.title}</TableCell>
+                        <TableCell className="max-w-xs truncate text-muted-foreground text-xs">
+                          {resource.filename ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {resource.archived_at ? new Date(resource.archived_at).toLocaleString() : '—'}
+                        </TableCell>
+                        <TableCell className="max-w-xs">
+                          {takenDown ? (
+                            <div className="space-y-1">
+                              <Badge variant="destructive">Removed by a moderator</Badge>
+                              {resource.archive_reason && (
+                                <p className="text-xs text-muted-foreground">{resource.archive_reason}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <Badge variant="secondary">Archived by you</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {takenDown ? (
+                            <span className="text-xs text-muted-foreground">Contact a moderator</span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={restoringId === resource.id}
+                              onClick={() => handleRestore(resource.id)}
+                            >
+                              {restoringId === resource.id ? 'Restoring...' : 'Restore'}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

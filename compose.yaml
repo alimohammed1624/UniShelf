@@ -26,6 +26,10 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      # config.py reads env_file=".env" relative to cwd, which is /app (the
+      # bind-mounted ./backend) — the repo-root .env is NOT visible in the
+      # container, so this passthrough is what actually delivers the key.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

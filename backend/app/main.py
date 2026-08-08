@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -12,6 +14,13 @@ from app.controllers.resources.router import router as resources_router
 from app.controllers.tags.router import router as tags_router
 from app.controllers.admin.router import router as admin_router
 from app.controllers.moderate.router import router as moderate_router
+
+# Without this the root logger stays at WARNING and every logger.info() in the
+# app — including the [admin-action] audit trail — is silently dropped.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

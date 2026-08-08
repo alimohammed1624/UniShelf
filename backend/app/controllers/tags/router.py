@@ -9,7 +9,16 @@ from app.models import Tag
 from app.models.enums import UserRole
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
-from .schemas import TagCreate, TagUpdate, TagSchema
+from app.utils.metrics import TAG_SUGGESTIONS
+from . import suggestions as suggestions_service
+from .schemas import (
+    TagCreate,
+    TagUpdate,
+    TagSchema,
+    TagSuggestion,
+    TagSuggestionRequest,
+    TagSuggestionsResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +64,37 @@ def create_tag(
 
     db.refresh(db_tag)
     return db_tag
+
+
+@router.post("/suggestions", response_model=TagSuggestionsResponse)
+def suggest_tags(
+    payload: TagSuggestionRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    AI-suggested tag filters for the current user.
+
+    POST rather than GET so the free-form search query stays out of access logs
+    and browser history. Always returns 200 — if Gemini is unconfigured, slow or
+    broken, the response falls back to popular tags and `source` says so.
+    """
+    results, source = suggestions_service.get_suggestions(
+        db=db,
+        user=current_user,
+        query=payload.query,
+        selected_tags=payload.selected_tags,
+        limit=payload.limit,
+    )
+
+    TAG_SUGGESTIONS.labels(source=source).inc()
+
+    return TagSuggestionsResponse(
+        suggestions=[
+            TagSuggestion(id=tag.id, name=tag.name, reason=reason) for tag, reason in results
+        ],
+        source=source,
+    )
 
 
 @router.put("/{tag_id}", response_model=TagSchema)

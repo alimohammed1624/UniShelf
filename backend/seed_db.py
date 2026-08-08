@@ -48,6 +48,8 @@ def reset_all(db: Session) -> None:
     db.execute(user_tags.delete())
     db.query(Resource).delete()
     db.query(Tag).delete()
+    # Clear the self-referencing FK before deleting the rows it points at
+    db.query(User).update({"banned_by_id": None}, synchronize_session=False)
     db.query(User).delete()
 
     # Clear MinIO bucket contents (best-effort)
@@ -73,8 +75,20 @@ def seed_users(db: Session) -> None:
 
     users_data = [
         {
+            "email": "superadmin@unishelf.edu",
+            "full_name": "Super Admin",
+            "role": int(UserRole.SUPERADMIN),
+            "password": "Super123!",
+        },
+        {
             "email": "admin@unishelf.edu",
             "full_name": "Admin User",
+            "role": int(UserRole.ADMIN),
+            "password": "Admin123!",
+        },
+        {
+            "email": "admin2@unishelf.edu",
+            "full_name": "Second Admin",
             "role": int(UserRole.ADMIN),
             "password": "Admin123!",
         },
@@ -96,6 +110,13 @@ def seed_users(db: Session) -> None:
             "role": int(UserRole.STUDENT),
             "password": "Student123!",
         },
+        {
+            "email": "banned@unishelf.edu",
+            "full_name": "Banned Student",
+            "role": int(UserRole.STUDENT),
+            "password": "Student123!",
+            "is_active": False,
+        },
     ]
 
     created = 0
@@ -110,7 +131,7 @@ def seed_users(db: Session) -> None:
             full_name=data["full_name"],
             role=data["role"],
             hashed_password=pwd_context.hash(data["password"]),
-            is_active=True,
+            is_active=data.get("is_active", True),
         )
         db.add(user)
         created += 1

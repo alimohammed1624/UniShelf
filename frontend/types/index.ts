@@ -12,6 +12,18 @@ export interface Tag {
   category: string;
 }
 
+export interface TagSuggestion {
+  id: number;
+  name: string;
+  reason: string;
+}
+
+export interface TagSuggestionsResponse {
+  suggestions: TagSuggestion[];
+  // How the backend produced the list: llm / cache / popular / fallback / disabled
+  source: string;
+}
+
 // ── Resource types ───────────────────────────────────────────
 
 export interface Resource {
@@ -29,11 +41,27 @@ export interface Resource {
   uploader_id: number;
   owner_id: number;
   is_archived: boolean;
+  archived_at: string | null;
+  archived_by_id: number | null;
+  archive_reason: string | null;
+  archive_kind: ArchiveKind | null;
   last_accessed_at: string | null;
   created_at: string;
   updated_at: string | null;
   tags: TagBrief[];
 }
+
+/**
+ * Why a resource was archived. SELF archives are the owner's own housekeeping
+ * and the owner may restore them; MODERATION archives are takedowns that only
+ * a moderator+ may lift.
+ */
+export const ArchiveKind = {
+  SELF: 0,
+  MODERATION: 1,
+} as const;
+
+export type ArchiveKind = (typeof ArchiveKind)[keyof typeof ArchiveKind];
 
 // ── User types ───────────────────────────────────────────────
 
@@ -45,6 +73,23 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string | null;
+}
+
+/** A user as returned by the /admin endpoints, with moderation metadata. */
+export interface AdminUser extends User {
+  banned_until: string | null;
+  ban_reason: string | null;
+  banned_at: string | null;
+  banned_by_id: number | null;
+  must_change_password: boolean;
+}
+
+/** Returned exactly once by POST /admin/users/{id}/reset-password. */
+export interface TempPasswordResult {
+  user_id: number;
+  email: string;
+  temp_password: string;
+  must_change_password: boolean;
 }
 
 export interface UserPublicProfile {

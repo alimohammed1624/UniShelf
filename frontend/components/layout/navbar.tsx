@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bookmark, FolderOpen, User, Shield, Settings } from 'lucide-react';
+import { Search, Bookmark, FolderOpen, User, Shield, ShieldCheck, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { logout } from '@/lib/features/auth/authSlice';
@@ -19,6 +19,7 @@ const NAV_LINKS = [
 const ADMIN_LINKS = [
   { href: '/moderate', label: 'Moderate', icon: Shield, role: 1 },
   { href: '/admin', label: 'Admin', icon: Settings, role: 2 },
+  { href: '/superadmin', label: 'Superadmin', icon: ShieldCheck, role: 3 },
 ];
 
 export function Navbar() {

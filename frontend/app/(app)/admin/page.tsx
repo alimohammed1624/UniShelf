@@ -1,149 +1,87 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchUsers, fetchResources, deleteResource } from '@/lib/features/admin/adminSlice';
+import { restoreResource } from '@/lib/features/resources/resourceSlice';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { UserLabel } from '@/components/ui/user-label';
+import { ThemeSelect } from '@/components/admin/theme-select';
+import { UserActions } from '@/components/admin/user-actions';
+import { UserStatusBadge } from '@/components/admin/user-status-badge';
+import { getRoleLabel, ROLE_OPTIONS } from '@/lib/roles';
 import { toast } from 'sonner';
+import { ArchiveKind, type Resource } from '@/types';
 
-/* ── Fully-themed custom select ─────────────────────────────────────── */
-function ThemeSelect<T extends string>({
-  value,
-  onChange,
-  options,
+function getVisibilityBadge(isPublic: boolean) {
+  return isPublic ? 'Public' : 'Private';
+}
+
+/**
+ * How an archive presents in the table. A moderation takedown and an owner's
+ * own housekeeping both hide a resource, but only one of them is a judgement
+ * call — an admin weighing up whether to reverse it needs to see which.
+ */
+function getArchiveBadge(kind: ArchiveKind | null): { label: string; className: string } {
+  if (kind === ArchiveKind.MODERATION) {
+    return { label: 'Takedown', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
+  }
+  if (kind === ArchiveKind.SELF) {
+    return { label: 'Self-archived', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+  }
+  return { label: 'Archived', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400' };
+}
+
+/** The "Archived" cell: what kind of archive it is, when it happened, by whom and why. */
+function ArchivedCell({
+  resource,
+  userMap,
 }: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string }[];
+  resource: Resource;
+  userMap: Map<number, { full_name: string; email: string }>;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  if (!resource.is_archived) return <span className="text-muted-foreground">—</span>;
 
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const selected = options.find((o) => o.value === value);
+  const badge = getArchiveBadge(resource.archive_kind);
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      {/* Trigger button */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          height: '2rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          padding: '0 0.75rem',
-          borderRadius: '0.375rem',
-          border: `1px solid oklch(0.68 0.14 75 / ${open ? '80%' : '45%'})`,
-          background: 'oklch(0.155 0.026 272)',
-          color: 'oklch(0.82 0.13 75)',
-          fontSize: '0.875rem',
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-          boxShadow: open ? '0 0 0 2px oklch(0.68 0.14 75 / 25%)' : 'none',
-          transition: 'border-color 0.15s, box-shadow 0.15s',
-          outline: 'none',
-          minWidth: '6rem',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span>{selected?.label}</span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="currentColor"
-          style={{ opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-        >
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {/* Dropdown panel */}
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            minWidth: '100%',
-            zIndex: 50,
-            background: 'oklch(0.155 0.026 272)',
-            border: '1px solid oklch(0.68 0.14 75 / 40%)',
-            borderRadius: '0.375rem',
-            boxShadow: '0 8px 24px oklch(0 0 0 / 50%), 0 0 0 1px oklch(0.68 0.14 75 / 12%) inset',
-            overflow: 'hidden',
-          }}
-        >
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '0.4rem 0.75rem',
-                textAlign: 'left',
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                border: 'none',
-                outline: 'none',
-                background: opt.value === value
-                  ? 'oklch(0.68 0.14 75 / 22%)'
-                  : 'transparent',
-                color: opt.value === value
-                  ? 'oklch(0.88 0.16 75)'
-                  : 'oklch(0.85 0.02 272)',
-                fontWeight: opt.value === value ? 500 : 400,
-                transition: 'background 0.1s, color 0.1s',
-              }}
-              onMouseEnter={(e) => {
-                if (opt.value !== value) {
-                  e.currentTarget.style.background = 'oklch(0.68 0.14 75 / 12%)';
-                  e.currentTarget.style.color = 'oklch(0.88 0.13 75)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (opt.value !== value) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'oklch(0.85 0.02 272)';
-                }
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+    <div className="space-y-1">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge.className}`}>
+        {badge.label}
+      </span>
+      {(resource.archived_at || resource.archived_by_id !== null) && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+          {resource.archived_at && <span>{new Date(resource.archived_at).toLocaleDateString()}</span>}
+          {resource.archived_by_id !== null && (
+            <>
+              <span>by</span>
+              <UserLabel
+                userId={resource.archived_by_id}
+                preloaded={userMap.get(resource.archived_by_id)}
+              />
+            </>
+          )}
+        </div>
+      )}
+      {resource.archive_reason && (
+        <div className="text-xs text-muted-foreground max-w-[200px] truncate" title={resource.archive_reason}>
+          {resource.archive_reason}
         </div>
       )}
     </div>
   );
-}
-
-function getRoleLabel(role: number): string {
-  switch (role) {
-    case 0: return 'Student';
-    case 1: return 'Moderator';
-    case 2: return 'Admin';
-    case 3: return 'Super Admin';
-    default: return `Unknown (${role})`;
-  }
-}
-
-function getVisibilityBadge(isPublic: boolean) {
-  return isPublic ? 'Public' : 'Private';
 }
 
 type Section = 'overview' | 'users' | 'resources';
@@ -190,44 +128,105 @@ function OverviewPanel() {
   );
 }
 
+const ROLE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All roles' },
+  ...ROLE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label })),
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'banned', label: 'Suspended' },
+];
+
 function UsersPanel() {
+  const dispatch = useAppDispatch();
   const users = useAppSelector((state) => state.admin.users);
   const loading = useAppSelector((state) => state.admin.usersLoading);
   const error = useAppSelector((state) => state.admin.usersError);
+  const actorRole = useAppSelector((state) => state.auth.user?.role ?? -1);
+  const selfId = useAppSelector((state) => state.auth.user?.id);
 
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
-  if (users.length === 0) {
-    return <p className="text-sm text-muted-foreground">No users found.</p>;
-  }
+  // Re-query the server whenever a filter changes (debounced for the search box)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      dispatch(
+        fetchUsers({
+          role: roleFilter === 'all' ? null : Number(roleFilter),
+          status: statusFilter === 'all' ? null : (statusFilter as 'active' | 'banned'),
+          q: search.trim() || null,
+        }),
+      );
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [dispatch, roleFilter, statusFilter, search]);
 
   return (
-    <div>
-      <h2 className="text-lg font-medium mb-4">Users</h2>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Name</th>
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Email</th>
-            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Role</th>
-            <th className="text-left py-2 font-medium text-muted-foreground">Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id} className="border-b last:border-b-0 hover:bg-muted/50">
-              <td className="py-2 pr-4">{user.full_name || user.email}</td>
-              <td className="py-2 pr-4 text-muted-foreground">{user.email}</td>
-              <td className="py-2 pr-4">{getRoleLabel(user.role)}</td>
-              <td className="py-2 text-muted-foreground">
-                {new Date(user.created_at).toLocaleDateString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Users</CardTitle>
+        <CardDescription>
+          Suspend, restore and reset passwords for the users in your care.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name or email"
+            className="h-8 max-w-xs"
+          />
+          <ThemeSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTER_OPTIONS} />
+          <ThemeSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {loading && users.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : users.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No users found.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.full_name || user.email}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{getRoleLabel(user.role)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <UserStatusBadge user={user} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap">
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <UserActions user={user} actorRole={actorRole} selfId={selfId} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -241,6 +240,12 @@ function ResourcesPanel() {
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [restoreConfirmId, setRestoreConfirmId] = useState<number | null>(null);
+
+  // Lifting an archive is recoverable, so any admin who can reach this page may
+  // do it. Deleting is a hard delete of the row and the file — superadmin only.
+  const canRestore = userRole >= 2;
+  const canDelete = userRole === 3;
 
   // Build a quick lookup: userId → { full_name, email }
   const userMap = new Map(users.map((u) => [u.id, { full_name: u.full_name, email: u.email }]));
@@ -271,6 +276,22 @@ function ResourcesPanel() {
     });
     await promise;
     setDeleteConfirmId(null);
+  };
+
+  const handleRestore = async (resourceId: number) => {
+    try {
+      await dispatch(restoreResource(resourceId)).unwrap();
+      toast.success('Resource restored');
+      // restoreResource updates the resources slice, which this panel does not
+      // read — refetch so the row leaves the archived view.
+      dispatch(fetchResources({ includeArchived: true }));
+    } catch (err) {
+      // A 403 (not yours to lift) or 409 (parent still archived) carries the
+      // backend's explanation; show it verbatim rather than a generic failure.
+      toast.error(String(err));
+    } finally {
+      setRestoreConfirmId(null);
+    }
   };
 
   if (loading && resources.length === 0) return <p className="text-muted-foreground">Loading...</p>;
@@ -329,6 +350,22 @@ function ResourcesPanel() {
         </div>
       )}
 
+      {/* Restore confirmation dialog */}
+      {restoreConfirmId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Restore Resource?</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              This lifts the archive and puts the resource back in front of its audience. It can be archived again at any time.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRestoreConfirmId(null)}>Cancel</Button>
+              <Button onClick={() => restoreConfirmId !== null && handleRestore(restoreConfirmId)}>Restore</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
@@ -338,15 +375,13 @@ function ResourcesPanel() {
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Visibility</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Uploaded</th>
             <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Archived</th>
-            {userRole === 3 && (
-              <th className="text-left py-2 font-medium text-muted-foreground">Actions</th>
-            )}
+            <th className="text-left py-2 font-medium text-muted-foreground">Actions</th>
           </tr>
         </thead>
         <tbody>
           {filteredResources.length === 0 ? (
             <tr>
-              <td colSpan={userRole === 3 ? 7 : 6} className="py-8 text-center text-sm text-muted-foreground">
+              <td colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                 {emptyMessage()}
               </td>
             </tr>
@@ -367,18 +402,19 @@ function ResourcesPanel() {
                 </span>
               </td>
               <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap">{new Date(resource.created_at).toLocaleDateString()}</td>
-              <td className="py-2 pr-4">
-                {resource.is_archived ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Archived</span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+              <td className="py-2 pr-4 align-top">
+                <ArchivedCell resource={resource} userMap={userMap} />
               </td>
-              {userRole === 3 && (
-                <td className="py-2 pr-4">
-                  <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmId(resource.id)}>Delete</Button>
-                </td>
-              )}
+              <td className="py-2 pr-4 align-top">
+                <div className="flex items-center gap-2">
+                  {canRestore && resource.is_archived && (
+                    <Button variant="outline" size="sm" onClick={() => setRestoreConfirmId(resource.id)}>Restore</Button>
+                  )}
+                  {canDelete && (
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmId(resource.id)}>Delete</Button>
+                  )}
+                </div>
+              </td>
             </tr>
           )))}
         </tbody>

@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     MAX_TAGS_PER_RESOURCE: int = 20
     MAX_TAGS_PER_USER: int = 20
 
+    # Gemini (AI tag suggestions)
+    # Optional on purpose: when unset the suggestions endpoint degrades to
+    # popularity ranking instead of failing. A field without a default would be
+    # required at import time and crash the app on boot for anyone without a key.
+    GEMINI_API_KEY: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
