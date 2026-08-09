@@ -6,7 +6,6 @@ import api from '@/lib/api';
 
 interface PublicProfile {
   id: number;
-  email: string;
   full_name: string;
   role: number;
 }
@@ -79,7 +78,12 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   }, [userId, preloaded]);
 
   const resolvedFullName = preloaded?.full_name ?? profile?.full_name ?? null;
-  const resolvedEmail    = preloaded?.email    ?? profile?.email    ?? null;
+  // Only ever from `preloaded`: the fetched `profile` comes from the public
+  // GET /users/{id} endpoint, which any authenticated user can call for any
+  // user_id, so its response deliberately excludes email. `preloaded` is
+  // only wired up from role-gated admin data (see admin/page.tsx), which is
+  // allowed to know it.
+  const resolvedEmail = preloaded?.email ?? null;
   const displayName = resolvedFullName ? firstName(resolvedFullName) : '';
 
   // Tooltip: show email when available (name is already visible on screen).

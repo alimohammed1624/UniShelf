@@ -94,7 +94,6 @@ export interface TempPasswordResult {
 
 export interface UserPublicProfile {
   id: number;
-  email: string;
   full_name: string;
   role: number;
   created_at: string;

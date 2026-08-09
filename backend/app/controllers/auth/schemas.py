@@ -73,8 +73,11 @@ class UserSchema(UserBase):
 
 
 class UserPublicProfile(BaseModel):
+    # No email: this schema is served to any authenticated user for any
+    # user_id (see GET /users/{user_id}), not just admins. Email is PII and
+    # must not be exposed here — see AdminUserSchema for the role-gated
+    # equivalent that does include it.
     id: int
-    email: EmailStr
     full_name: str
     role: int
     created_at: datetime
