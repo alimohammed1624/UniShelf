@@ -32,7 +32,10 @@ import {
   deleteResource,
   changeResourceFile,
   downloadResource,
+  uploadResource,
+  createDirectory,
 } from '@/lib/features/resources/resourceSlice';
+import { ResourceUploadCard } from '@/components/dashboard/resource-upload-card';
 import {
   createTag,
   assignTagsToResource,
@@ -106,9 +109,16 @@ export default function ResourceDetailPage({
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
-  const { data: treeData, loading: treeLoading } = useResourceTree({
+  const { data: treeData, loading: treeLoading, refetch: refetchTree } = useResourceTree({
     resourceId,
   });
+
+  // Add-contents form state (create subdirectory / upload file into this directory)
+  const [addTitle, setAddTitle] = useState('');
+  const [addDescription, setAddDescription] = useState('');
+  const [addFile, setAddFile] = useState<File | null>(null);
+  const [addVisibility, setAddVisibility] = useState('public');
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -366,6 +376,67 @@ export default function ResourceDetailPage({
     const promise = dispatch(downloadResource({ id: resource.id, title: resource.title })).unwrap();
     toast.promise(promise, { loading: 'Downloading...', success: 'Download started', error: 'Download failed' });
     promise.catch(() => {});
+  };
+
+  // ── Add-to-directory handlers ────────────────────────────
+
+  const resetAddForm = () => {
+    setAddTitle('');
+    setAddDescription('');
+    setAddFile(null);
+    setAddVisibility('public');
+    if (addFileInputRef.current) addFileInputRef.current.value = '';
+  };
+
+  const handleUploadIntoDirectory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resource || !addFile) return;
+    const formData = new FormData();
+    formData.append('title', addTitle);
+    formData.append('description', addDescription);
+    formData.append('file', addFile);
+    formData.append('is_public', String(addVisibility === 'public'));
+    formData.append('parent_id', String(resource.id));
+
+    try {
+      const promise = dispatch(uploadResource(formData)).unwrap();
+      toast.promise(promise, {
+        loading: 'Uploading...',
+        success: 'Upload successful',
+        error: (err) => (typeof err === 'string' ? err : 'Upload failed'),
+      });
+      await promise;
+      resetAddForm();
+      refetchTree();
+    } catch {
+      // handled by toast
+    }
+  };
+
+  const handleCreateSubdirectory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resource || !addTitle.trim()) return;
+
+    try {
+      const promise = dispatch(
+        createDirectory({
+          title: addTitle,
+          description: addDescription,
+          is_public: addVisibility === 'public',
+          parent_id: resource.id,
+        }),
+      ).unwrap();
+      toast.promise(promise, {
+        loading: 'Creating folder...',
+        success: 'Folder created',
+        error: (err) => (typeof err === 'string' ? err : 'Failed to create folder'),
+      });
+      await promise;
+      resetAddForm();
+      refetchTree();
+    } catch {
+      // handled by toast
+    }
   };
 
   // ── Preview helpers ──────────────────────────────────────
@@ -836,18 +907,22 @@ export default function ResourceDetailPage({
               </div>
 
               <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Filename:</span>{" "}
-                  <span className="text-muted-foreground">
-                    {resource.filename ?? "—"}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Size:</span>{" "}
-                  <span className="text-muted-foreground">
-                    {formatSize(resource.size)}
-                  </span>
-                </div>
+                {resource.type !== "directory" && (
+                  <>
+                    <div>
+                      <span className="font-medium">Filename:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {resource.filename ?? "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Size:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {formatSize(resource.size)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div>
                   <span className="font-medium">Type:</span>{" "}
                   <span className="text-muted-foreground">{resource.type}</span>
@@ -937,7 +1012,7 @@ export default function ResourceDetailPage({
           <Button variant="outline" onClick={() => openEditModal(resource)}>
             Edit
           </Button>
-          {resource.type !== "link" && (
+          {resource.type !== "link" && resource.type !== "directory" && (
             <Button
               variant="outline"
               onClick={() => setChangingResource(resource)}
@@ -959,6 +1034,34 @@ export default function ResourceDetailPage({
           </Button>
         </div>
       )}
+
+      {/* ── Add contents (owner/admin only, directories only) ── */}
+      {resource.type === "directory" &&
+        (resource.owner_id === user?.id || (user && user.role >= 2)) && (
+          <ResourceUploadCard
+            title={addTitle}
+            description={addDescription}
+            file={addFile}
+            fileInputRef={addFileInputRef}
+            linkUrl=""
+            visibility={addVisibility}
+            onTitleChange={setAddTitle}
+            onDescriptionChange={setAddDescription}
+            onFileChange={setAddFile}
+            onRemoveFile={() => {
+              setAddFile(null);
+              if (addFileInputRef.current) addFileInputRef.current.value = '';
+            }}
+            onLinkUrlChange={() => {}}
+            onVisibilityChange={setAddVisibility}
+            onSubmitFile={handleUploadIntoDirectory}
+            onSubmitLink={() => {}}
+            onSubmitDirectory={handleCreateSubdirectory}
+            tabs={['file', 'directory']}
+            cardTitle="Add to This Folder"
+            cardDescription="Upload a file or create a subfolder here."
+          />
+        )}
 
       {/* ── Resource tree ──────────────────────────────────── */}
       {treeData && (

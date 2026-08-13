@@ -38,7 +38,7 @@ from app.utils.db_helpers import (
     sanitize_filename,
     validate_hierarchy,
 )
-from .schemas import ResourceSchema, ResourceUpdate, VisibilityCreate, VisibilitySchema, TagBrief
+from .schemas import ResourceSchema, ResourceUpdate, DirectoryCreate, VisibilityCreate, VisibilitySchema, TagBrief
 from app.controllers.moderate.schemas import ResourceBrief
 from app.config import settings
 from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
@@ -141,6 +141,7 @@ async def upload_resource(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
 
     # Read file content and validate size
     file_content = await file.read()
@@ -209,6 +210,46 @@ async def upload_resource(
 
     db.refresh(db_resource)
     UPLOAD_COUNT.labels(status="success").inc()
+    return db_resource
+
+
+@router.post("/directory", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
+def create_directory(
+    payload: DirectoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.parent_id is not None:
+        parent = db.query(Resource).filter(Resource.id == payload.parent_id).first()
+        if parent is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
+        if parent.type != "directory":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
+
+    db_resource = Resource(
+        title=payload.title,
+        description=payload.description,
+        file_path=None,
+        hierarchy="",
+        parent_id=payload.parent_id,
+        filename=None,
+        size=None,
+        type="directory",
+        is_public=payload.is_public,
+        is_anonymous=payload.is_anonymous,
+        uploader_id=current_user.id,
+        owner_id=current_user.id,
+    )
+    db.add(db_resource)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create directory")
+
+    db.refresh(db_resource)
     return db_resource
 
 

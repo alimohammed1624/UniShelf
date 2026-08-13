@@ -157,6 +157,23 @@ export const submitLink = createAsyncThunk<Resource, { title: string; descriptio
   }
 );
 
+export const createDirectory = createAsyncThunk<
+  Resource,
+  { title: string; description: string; is_public: boolean; parent_id?: number },
+  { rejectValue: string }
+>(
+  'resources/createDirectory',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const response = await api.post<Resource>('/resources/directory', payload);
+      return response.data;
+    } catch (err) {
+      const error = err as AxiosError<{ detail: unknown }>;
+      return rejectWithValue(extractErrorMessage(error.response?.data?.detail, 'Failed to create directory'));
+    }
+  }
+);
+
 export const changeResourceFile = createAsyncThunk<Resource, { id: number; formData: FormData }, { rejectValue: string }>(
   'resources/changeFile',
   async ({ id, formData }, { rejectWithValue }) => {
@@ -218,6 +235,19 @@ const resourceSlice = createSlice({
       .addCase(submitLink.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to submit link';
+      })
+      // Create directory
+      .addCase(createDirectory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createDirectory.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items.push(action.payload);
+      })
+      .addCase(createDirectory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to create directory';
       })
       // Edit
       .addCase(editResource.fulfilled, (state, action) => {
