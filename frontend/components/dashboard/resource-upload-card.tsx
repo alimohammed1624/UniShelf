@@ -13,11 +13,13 @@ interface ResourceUploadCardProps {
   file: File | null;
   fileInputRef: RefObject<HTMLInputElement | null>;
   linkUrl: string;
+  visibility: string;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onFileChange: (file: File | null) => void;
   onRemoveFile: () => void;
   onLinkUrlChange: (value: string) => void;
+  onVisibilityChange: (value: string) => void;
   onSubmitFile: (e: FormEvent) => void;
   onSubmitLink: (e: FormEvent) => void;
 }
@@ -28,11 +30,13 @@ export function ResourceUploadCard({
   file,
   fileInputRef,
   linkUrl,
+  visibility,
   onTitleChange,
   onDescriptionChange,
   onFileChange,
   onRemoveFile,
   onLinkUrlChange,
+  onVisibilityChange,
   onSubmitFile,
   onSubmitLink,
 }: ResourceUploadCardProps) {
@@ -96,6 +100,18 @@ export function ResourceUploadCard({
               onChange={(e) => onDescriptionChange(e.target.value)}
               rows={4}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="resource-visibility">Visibility</Label>
+            <select
+              id="resource-visibility"
+              value={visibility}
+              onChange={(e) => onVisibilityChange(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+            </select>
           </div>
 
           {/* Tab-specific field */}
