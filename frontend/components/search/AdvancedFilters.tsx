@@ -29,6 +29,7 @@ const RESOURCE_TYPES = [
   { id: 'image', label: 'Image', mime: 'image/' },
   { id: 'code', label: 'Code', mime: 'text/' },
   { id: 'link', label: 'Link', mime: 'link' },
+  { id: 'directory', label: 'Folder', mime: 'directory' },
 ];
 
 export function AdvancedFilters({

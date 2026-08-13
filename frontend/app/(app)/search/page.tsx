@@ -211,6 +211,7 @@ function SearchPageContent() {
         if (typeId === 'image' && r.type?.startsWith('image/')) return true;
         if (typeId === 'code' && r.type?.startsWith('text/')) return true;
         if (typeId === 'link' && r.type === 'link') return true;
+        if (typeId === 'directory' && r.type === 'directory') return true;
         return false;
       });
       if (!matchesType) return false;
