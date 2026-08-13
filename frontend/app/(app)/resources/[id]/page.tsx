@@ -1069,6 +1069,7 @@ export default function ResourceDetailPage({
           parents={treeData.parents}
           children={treeData.children}
           currentId={resource.id}
+          currentTitle={resource.title}
         />
       )}
       {treeLoading && (
