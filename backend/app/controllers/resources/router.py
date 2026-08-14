@@ -286,11 +286,9 @@ def list_resources(
         )
 
     # ── Visibility filtering ──
-    # Admin+ sees everything; others see everything except what they are denied,
-    # which includes the contents of folders they cannot reach.
-    denied_ids = inaccessible_resource_ids(db, current_user)
-    if denied_ids is not None:
-        query = query.filter(Resource.id.not_in(denied_ids))
+    # Everything except what the caller is denied, which includes the contents
+    # of folders they cannot reach.
+    query = query.filter(Resource.id.not_in(inaccessible_resource_ids(db, current_user)))
 
     # ── Search & filter ──
     if q:
@@ -896,7 +894,7 @@ def _build_children_tree(
     current_depth: int,
     max_depth: int,
     user: User,
-    denied_ids: Optional[Select],
+    denied_ids: Select,
 ) -> List[dict]:
     """
     Recursively build a tree of children resources with visibility filtering.
@@ -916,9 +914,7 @@ def _build_children_tree(
         )
     )
 
-    # Apply visibility filtering for non-admin users
-    if denied_ids is not None:
-        query = query.filter(Resource.id.not_in(denied_ids))
+    query = query.filter(Resource.id.not_in(denied_ids))
 
     children = query.order_by(Resource.title.asc()).all()
     result = []

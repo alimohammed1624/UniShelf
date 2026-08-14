@@ -18,6 +18,7 @@ from app.controllers.auth.helpers import (
     EDU_EMAIL_RE,
 )
 from app.controllers.resources.schemas import ResourceSchema
+from app.utils.db_helpers import inaccessible_resource_ids
 from app.utils.minio_client import delete_file
 from app.utils.thumbnails import thumbnail_object_key
 from .schemas import (
@@ -41,8 +42,16 @@ def list_all_resources(
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    """List all resources including archived ones, with anonymous uploaders visible."""
+    """
+    List all resources including archived ones, with anonymous uploaders visible.
+
+    "All" still stops at rank: the private resources of owners at or above the
+    caller's own role are filtered out, so this endpoint cannot be used to read
+    past the limit that applies everywhere else.
+    """
     query = db.query(Resource).options(selectinload(Resource.tags))
+
+    query = query.filter(Resource.id.not_in(inaccessible_resource_ids(db, current_user)))
 
     if not include_archived:
         query = query.filter(Resource.is_archived == False)
