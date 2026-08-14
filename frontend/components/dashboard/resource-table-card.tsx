@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserLabel } from '@/components/ui/user-label';
+import { VisibilitySelect } from '@/components/ui/visibility-select';
 import {
   Table,
   TableBody,
@@ -471,14 +472,7 @@ export function ResourceTableCard({
               </div>
               <div className="space-y-2">
                 <Label>Visibility</Label>
-                <select
-                  value={editVisibility}
-                  onChange={(e) => setEditVisibility(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                </select>
+                <VisibilitySelect value={editVisibility} onChange={setEditVisibility} />
               </div>
             </div>
 

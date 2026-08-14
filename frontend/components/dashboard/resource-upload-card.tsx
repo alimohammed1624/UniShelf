@@ -1,17 +1,12 @@
 'use client';
 
-import { FormEvent, RefObject, useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { FormEvent, RefObject, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { VisibilitySelect } from '@/components/ui/visibility-select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-const VISIBILITY_OPTIONS = [
-  { value: 'public', label: 'Public' },
-  { value: 'private', label: 'Private' },
-];
 
 type UploadTab = 'file' | 'link' | 'directory';
 
@@ -69,31 +64,7 @@ export function ResourceUploadCard({
   cardDescription = 'Share notes, assignments, study material, or a web link.',
 }: ResourceUploadCardProps) {
   const [tab, setTab] = useState<UploadTab>(tabs[0]);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const visibilityRef = useRef<HTMLDivElement>(null);
   const fileSizeLabel = file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '';
-  const visibilityLabel =
-    VISIBILITY_OPTIONS.find((option) => option.value === visibility)?.label ?? 'Select visibility';
-
-  useEffect(() => {
-    if (!visibilityOpen) return;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!visibilityRef.current?.contains(e.target as Node)) {
-        setVisibilityOpen(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setVisibilityOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [visibilityOpen]);
 
   const handleSubmit = (e: FormEvent) => {
     if (tab === 'file') {
@@ -152,41 +123,11 @@ export function ResourceUploadCard({
           </div>
           <div className="space-y-2">
             <Label htmlFor="resource-visibility">Visibility</Label>
-            <div className="relative" ref={visibilityRef}>
-              <button
-                type="button"
-                id="resource-visibility"
-                onClick={() => setVisibilityOpen((open) => !open)}
-                aria-haspopup="listbox"
-                aria-expanded={visibilityOpen}
-                className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {visibilityLabel}
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </button>
-              {visibilityOpen ? (
-                <div
-                  role="listbox"
-                  className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border bg-popover p-1 shadow-md"
-                >
-                  {VISIBILITY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="option"
-                      aria-selected={option.value === visibility}
-                      onClick={() => {
-                        onVisibilityChange(option.value);
-                        setVisibilityOpen(false);
-                      }}
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <VisibilitySelect
+              id="resource-visibility"
+              value={visibility}
+              onChange={onVisibilityChange}
+            />
           </div>
 
           {/* Tab-specific field */}
