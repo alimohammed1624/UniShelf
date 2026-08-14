@@ -103,10 +103,18 @@ def list_all_users(
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    """List all users with full details, including moderation metadata."""
+    """
+    List all users with full details, including moderation metadata.
+
+    Rank caps the listing: users ranked strictly above the caller are left out,
+    so an admin's dashboard never surfaces a superadmin. Peers stay visible —
+    they are part of the picture an admin needs — but `assert_can_manage` still
+    refuses every action on them. The cap keys off the caller's own role rather
+    than naming SUPERADMIN, so the same endpoint serves both dashboards.
+    """
     _sweep_expired_bans(db)
 
-    query = db.query(User)
+    query = db.query(User).filter(User.role <= current_user.role)
 
     if role is not None:
         query = query.filter(User.role == role)
