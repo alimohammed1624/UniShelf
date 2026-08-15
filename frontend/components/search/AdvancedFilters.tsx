@@ -5,6 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { RESOURCE_CATEGORIES } from '@/lib/resource-categories';
 
 export interface AdvancedFilterState {
   searchQuery: string;
@@ -30,15 +31,6 @@ const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>
 // Resources can only have been uploaded in the past, so the picker offers the
 // current year and the 29 before it rather than an open-ended range.
 const YEAR_RANGE = 30;
-
-const RESOURCE_TYPES = [
-  { id: 'pdf', label: 'PDF', mime: 'application/pdf' },
-  { id: 'video', label: 'Video', mime: 'video/' },
-  { id: 'image', label: 'Image', mime: 'image/' },
-  { id: 'code', label: 'Code', mime: 'text/' },
-  { id: 'link', label: 'Link', mime: 'link' },
-  { id: 'directory', label: 'Folder', mime: 'directory' },
-];
 
 export function AdvancedFilters({
   filters,
@@ -221,7 +213,7 @@ export function AdvancedFilters({
           onClear={() => onFilterChange({ ...filters, resourceTypes: [] })}
         >
           <div className="flex flex-wrap gap-2">
-            {RESOURCE_TYPES.map((type) => {
+            {RESOURCE_CATEGORIES.map((type) => {
               const isSelected = filters.resourceTypes.includes(type.id);
 
               return (

@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import { AdvancedFilters, AdvancedFilterState } from '@/components/search/AdvancedFilters';
+import { matchesResourceCategory } from '@/lib/resource-categories';
 import {
   fetchResources,
   downloadResource,
@@ -205,15 +206,9 @@ function SearchPageContent() {
     }
 
     if (advancedFilters.resourceTypes.length > 0) {
-      const matchesType = advancedFilters.resourceTypes.some((typeId) => {
-        if (typeId === 'pdf' && r.type === 'application/pdf') return true;
-        if (typeId === 'video' && r.type?.startsWith('video/')) return true;
-        if (typeId === 'image' && r.type?.startsWith('image/')) return true;
-        if (typeId === 'code' && r.type?.startsWith('text/')) return true;
-        if (typeId === 'link' && r.type === 'link') return true;
-        if (typeId === 'directory' && r.type === 'directory') return true;
-        return false;
-      });
+      const matchesType = advancedFilters.resourceTypes.some((typeId) =>
+        matchesResourceCategory(r, typeId)
+      );
       if (!matchesType) return false;
     }
 
