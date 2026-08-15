@@ -543,6 +543,9 @@ export default function HomePage() {
           <span className="text-xs text-muted-foreground">
             Central document storage and sharing for your organization.
           </span>
+          <span className="text-xs text-muted-foreground sm:ml-auto">
+            © {new Date().getFullYear()} UniShelf. All rights reserved.
+          </span>
         </div>
       </footer>
     </div>

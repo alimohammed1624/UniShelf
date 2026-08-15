@@ -405,7 +405,7 @@ function ResourcesPanel() {
               <td className="py-2 pr-4 text-muted-foreground">
                 <UserLabel
                   userId={resource.owner_id}
-                  preloaded={userMap.get(resource.owner_id)}
+                  preloaded={resource.owner_id !== null ? userMap.get(resource.owner_id) : undefined}
                 />
               </td>
               <td className="py-2 pr-4">

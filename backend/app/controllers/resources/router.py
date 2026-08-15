@@ -41,7 +41,7 @@ from app.utils.db_helpers import (
     validate_hierarchy,
 )
 from .schemas import ResourceSchema, ResourceUpdate, DirectoryCreate, VisibilityCreate, VisibilitySchema, TagBrief
-from app.controllers.moderate.schemas import ResourceBrief
+from app.controllers.moderate.schemas import ResourceBrief, redact_report_uploader
 from app.config import settings
 from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
 from pydantic import BaseModel
@@ -76,6 +76,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/resources", tags=["resources"])
 
 MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+
+def _floor_anonymity(requested: bool, parent: Optional[Resource]) -> bool:
+    """
+    Anonymity floors downward: nothing credited may sit inside an anonymous
+    folder.
+
+    Only the owner of a folder may upload into it, so a credited child of an
+    anonymous folder names the very person the folder is hiding. The floor is
+    applied once, at write time, and stored — it is not recomputed on read.
+    That keeps it compatible with the one-way latch in update_resource: moving a
+    resource can only ever add anonymity, never take it back off, so a resource
+    dragged out of an anonymous folder stays anonymous.
+    """
+    return requested or (parent is not None and parent.is_anonymous)
 
 
 # ── Upload ────────────────────────────────────────────────────
@@ -118,7 +133,7 @@ async def submit_link_resource(
 
     db.refresh(db_resource)
     UPLOAD_COUNT.labels(status="success").inc()
-    return db_resource
+    return ResourceSchema.for_viewer(db_resource, current_user)
 
 
 @router.post("", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
@@ -137,6 +152,7 @@ async def upload_resource(
     hierarchy = validate_hierarchy(hierarchy)
 
     # Validate parent exists and is a directory if specified
+    parent = None
     if parent_id is not None:
         parent = db.query(Resource).filter(Resource.id == parent_id).first()
         if parent is None:
@@ -144,6 +160,8 @@ async def upload_resource(
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
         require_resource_owner(parent, current_user)
+
+    is_anonymous = _floor_anonymity(is_anonymous, parent)
 
     # Read file content and validate size
     file_content = await file.read()
@@ -212,7 +230,7 @@ async def upload_resource(
 
     db.refresh(db_resource)
     UPLOAD_COUNT.labels(status="success").inc()
-    return db_resource
+    return ResourceSchema.for_viewer(db_resource, current_user)
 
 
 @router.post("/directory", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
@@ -221,6 +239,7 @@ def create_directory(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    parent = None
     if payload.parent_id is not None:
         parent = db.query(Resource).filter(Resource.id == payload.parent_id).first()
         if parent is None:
@@ -239,7 +258,7 @@ def create_directory(
         size=None,
         type="directory",
         is_public=payload.is_public,
-        is_anonymous=payload.is_anonymous,
+        is_anonymous=_floor_anonymity(payload.is_anonymous, parent),
         uploader_id=current_user.id,
         owner_id=current_user.id,
     )
@@ -252,7 +271,7 @@ def create_directory(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create directory")
 
     db.refresh(db_resource)
-    return db_resource
+    return ResourceSchema.for_viewer(db_resource, current_user)
 
 
 # ── List (with visibility filtering) ─────────────────────────
@@ -306,6 +325,11 @@ def list_resources(
 
     if uploader_id:
         query = query.filter(Resource.uploader_id == uploader_id)
+        # Redacting the id in the response is not enough on its own: filtering by
+        # uploader is an oracle that answers the same question a row at a time.
+        # Members get anonymous uploads dropped from a by-uploader search.
+        if current_user.role < int(UserRole.MODERATOR):
+            query = query.filter(Resource.is_anonymous == False)
 
     if tags:
         tag_names = [t.strip().lower() for t in tags.split(",") if t.strip()][:10]
@@ -316,7 +340,7 @@ def list_resources(
     query = query.order_by(Resource.created_at.desc(), Resource.id.desc())
 
     resources = query.offset(skip).limit(limit).all()
-    return resources
+    return [ResourceSchema.for_viewer(r, current_user) for r in resources]
 
 
 # ── Single resource detail ────────────────────────────────────
@@ -338,7 +362,7 @@ def get_resource(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
     require_resource_access(db, resource, current_user)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Update metadata ───────────────────────────────────────────
@@ -354,6 +378,8 @@ def update_resource(
     resource = get_resource_or_404(db, resource_id)
     require_resource_owner(resource, current_user)
 
+    was_anonymous = resource.is_anonymous
+
     if updates.title is not None:
         resource.title = updates.title.strip()
     if updates.description is not None:
@@ -361,6 +387,14 @@ def update_resource(
     if updates.is_public is not None:
         resource.is_public = updates.is_public
     if updates.is_anonymous is not None:
+        # One-way latch. Lifting anonymity would retroactively attach a name to
+        # something published without one, so the only accepted transition is
+        # towards anonymous — never away from it.
+        if resource.is_anonymous and not updates.is_anonymous:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Anonymity cannot be lifted once a resource has been published anonymously",
+            )
         resource.is_anonymous = updates.is_anonymous
     if updates.hierarchy is not None:
         resource.hierarchy = validate_hierarchy(updates.hierarchy)
@@ -371,10 +405,19 @@ def update_resource(
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
         resource.parent_id = updates.parent_id
+        resource.is_anonymous = _floor_anonymity(resource.is_anonymous, parent)
+
+    # A directory that has just turned anonymous takes its subtree with it,
+    # whether it was flagged directly or floored by a move: a credited child
+    # would name the owner the folder is now hiding. Only ever sets the flag, so
+    # the latch above still holds for every row it touches.
+    if resource.is_anonymous and not was_anonymous and resource.type == "directory":
+        for descendant in _collect_descendants(db, resource.id):
+            descendant.is_anonymous = True
 
     db.commit()
     db.refresh(resource)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Replace file ──────────────────────────────────────────────
@@ -444,7 +487,7 @@ async def replace_resource_file(
         logger.warning(f"Failed to delete cached thumbnail for resource {resource.id}")
 
     db.refresh(resource)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Soft delete ───────────────────────────────────────────────
@@ -570,7 +613,7 @@ def restore_resource(
 
     if not resource.is_archived:
         require_resource_owner(resource, current_user)
-        return resource
+        return ResourceSchema.for_viewer(resource, current_user)
 
     # Who may lift an archive depends on why it was made, so the kind is checked
     # before ownership. require_resource_owner allows owner-or-admin, and a
@@ -611,7 +654,7 @@ def restore_resource(
         f"Resource {resource_id} restored by user {current_user.id} "
         f"({restored} descendant(s) cascaded)"
     )
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Download (streaming) ─────────────────────────────────────
@@ -725,7 +768,7 @@ def transfer_ownership(
     db.commit()
     db.refresh(resource)
     logger.info(f"Resource {resource_id} ownership transferred from {current_user.id} to {new_owner_id}")
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Visibility (ACL) management ───────────────────────────────
@@ -1060,4 +1103,6 @@ def report_resource(
     db.refresh(new_report)
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {resource_id}")
-    return new_report
+    return redact_report_uploader(
+        _ReportResponse.model_validate(new_report), resource, current_user
+    )

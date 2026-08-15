@@ -75,11 +75,19 @@ export const downloadResource = createAsyncThunk<void, { id: number; title: stri
   }
 );
 
-export const editResource = createAsyncThunk<Resource, { id: number; title: string; description: string; is_public: boolean }, { rejectValue: string }>(
+export const editResource = createAsyncThunk<Resource, { id: number; title: string; description: string; is_public: boolean; is_anonymous?: boolean }, { rejectValue: string }>(
   'resources/edit',
-  async ({ id, title, description, is_public }, { rejectWithValue }) => {
+  async ({ id, title, description, is_public, is_anonymous }, { rejectWithValue }) => {
     try {
-      const response = await api.put<Resource>(`/resources/${id}`, { title, description, is_public });
+      // Only ever sent when turning anonymity ON. The API rejects false on an
+      // already-anonymous resource, so omitting the field is what lets an
+      // ordinary title edit leave the flag alone.
+      const response = await api.put<Resource>(`/resources/${id}`, {
+        title,
+        description,
+        is_public,
+        ...(is_anonymous ? { is_anonymous: true } : {}),
+      });
       return response.data;
     } catch (err) {
       const error = err as AxiosError<{ detail: unknown }>;
@@ -139,15 +147,16 @@ export const restoreResource = createAsyncThunk<Resource, number, { rejectValue:
   }
 );
 
-export const submitLink = createAsyncThunk<Resource, { title: string; description: string; url: string; is_public: boolean }, { rejectValue: string }>(
+export const submitLink = createAsyncThunk<Resource, { title: string; description: string; url: string; is_public: boolean; is_anonymous: boolean }, { rejectValue: string }>(
   'resources/submitLink',
-  async ({ title, description, url, is_public }, { rejectWithValue }) => {
+  async ({ title, description, url, is_public, is_anonymous }, { rejectWithValue }) => {
     try {
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
       formData.append('url', url);
       formData.append('is_public', String(is_public));
+      formData.append('is_anonymous', String(is_anonymous));
       const response = await api.post<Resource>('/resources/link', formData);
       return response.data;
     } catch (err) {
@@ -159,7 +168,7 @@ export const submitLink = createAsyncThunk<Resource, { title: string; descriptio
 
 export const createDirectory = createAsyncThunk<
   Resource,
-  { title: string; description: string; is_public: boolean; parent_id?: number },
+  { title: string; description: string; is_public: boolean; is_anonymous: boolean; parent_id?: number },
   { rejectValue: string }
 >(
   'resources/createDirectory',

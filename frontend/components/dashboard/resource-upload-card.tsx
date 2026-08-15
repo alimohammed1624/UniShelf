@@ -29,12 +29,14 @@ interface ResourceUploadCardProps {
   fileInputRef: RefObject<HTMLInputElement | null>;
   linkUrl: string;
   visibility: string;
+  anonymous: boolean;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onFileChange: (file: File | null) => void;
   onRemoveFile: () => void;
   onLinkUrlChange: (value: string) => void;
   onVisibilityChange: (value: string) => void;
+  onAnonymousChange: (value: boolean) => void;
   onSubmitFile: (e: FormEvent) => void;
   onSubmitLink: (e: FormEvent) => void;
   onSubmitDirectory?: (e: FormEvent) => void;
@@ -50,12 +52,14 @@ export function ResourceUploadCard({
   fileInputRef,
   linkUrl,
   visibility,
+  anonymous,
   onTitleChange,
   onDescriptionChange,
   onFileChange,
   onRemoveFile,
   onLinkUrlChange,
   onVisibilityChange,
+  onAnonymousChange,
   onSubmitFile,
   onSubmitLink,
   onSubmitDirectory,
@@ -128,6 +132,21 @@ export function ResourceUploadCard({
               value={visibility}
               onChange={onVisibilityChange}
             />
+          </div>
+          <div className="rounded-lg border bg-muted/35 p-3">
+            <label htmlFor="resource-anonymous" className="flex cursor-pointer items-center gap-2.5">
+              <input
+                id="resource-anonymous"
+                type="checkbox"
+                checked={anonymous}
+                onChange={(e) => onAnonymousChange(e.target.checked)}
+                className="h-4 w-4 shrink-0 accent-primary"
+              />
+              <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span className="text-sm font-medium leading-none">Upload anonymously</span>
+                <span className="text-xs text-muted-foreground leading-none">This cannot be undone.</span>
+              </span>
+            </label>
           </div>
 
           {/* Tab-specific field */}

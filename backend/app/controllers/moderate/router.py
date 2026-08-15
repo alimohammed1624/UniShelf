@@ -10,7 +10,7 @@ from app.models.enums import UserRole, ReportStatus, ArchiveKind
 from app.database import get_db
 from app.controllers.auth.helpers import get_current_user, require_role
 from app.controllers.resources.schemas import ResourceSchema
-from .schemas import ReportCreate, ReportSchema, ResourceBrief
+from .schemas import ReportCreate, ReportSchema, ResourceBrief, redact_report_uploader
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,9 @@ def submit_report(
     db.refresh(new_report)
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {report_data.resource_id}")
-    return new_report
+    return redact_report_uploader(
+        ReportSchema.model_validate(new_report), resource, current_user
+    )
 
 
 @router.get("/reports", response_model=list[ReportSchema])
