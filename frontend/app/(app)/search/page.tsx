@@ -271,9 +271,9 @@ function SearchPageContent() {
     await promise.catch(() => {});
   };
 
-  const handleEdit = async (id: number, title: string, desc: string, visibility: string) => {
+  const handleEdit = async (id: number, title: string, desc: string, visibility: string, anonymous: boolean) => {
     try {
-      const promise = dispatch(editResource({ id, title, description: desc, is_public: visibility === 'public' })).unwrap();
+      const promise = dispatch(editResource({ id, title, description: desc, is_public: visibility === 'public', is_anonymous: anonymous })).unwrap();
       toast.promise(promise, { loading: 'Saving...', success: 'Resource updated', error: 'Edit failed' });
       await promise;
       return true;

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, EyeOff } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { Resource, TagBrief } from '@/types';
 import api from '@/lib/api';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserLabel } from '@/components/ui/user-label';
+import { AnonymizeField } from '@/components/ui/anonymize-field';
 import { Dirtree } from '@/components/dirtree/Dirtree';
 import { useResourceTree } from '@/hooks/useResourceTree';
 import {
@@ -70,6 +71,7 @@ export default function ResourceDetailPage({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editVisibility, setEditVisibility] = useState("public");
+  const [editAnonymous, setEditAnonymous] = useState(false);
 
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -119,6 +121,7 @@ export default function ResourceDetailPage({
   const [addDescription, setAddDescription] = useState('');
   const [addFile, setAddFile] = useState<File | null>(null);
   const [addVisibility, setAddVisibility] = useState('public');
+  const [addAnonymous, setAddAnonymous] = useState(false);
   const addFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -193,6 +196,7 @@ export default function ResourceDetailPage({
     setEditTitle(res.title);
     setEditDescription(res.description || "");
     setEditVisibility(res.is_public ? "public" : "private");
+    setEditAnonymous(false);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -204,6 +208,7 @@ export default function ResourceDetailPage({
         title: editTitle,
         description: editDescription,
         is_public: editVisibility === "public",
+        is_anonymous: editAnonymous,
       }),
     ).unwrap();
     toast.promise(promise, {
@@ -386,6 +391,7 @@ export default function ResourceDetailPage({
     setAddDescription('');
     setAddFile(null);
     setAddVisibility('public');
+    setAddAnonymous(false);
     if (addFileInputRef.current) addFileInputRef.current.value = '';
   };
 
@@ -397,6 +403,7 @@ export default function ResourceDetailPage({
     formData.append('description', addDescription);
     formData.append('file', addFile);
     formData.append('is_public', String(addVisibility === 'public'));
+    formData.append('is_anonymous', String(addAnonymous));
     formData.append('parent_id', String(resource.id));
 
     try {
@@ -424,6 +431,7 @@ export default function ResourceDetailPage({
           title: addTitle,
           description: addDescription,
           is_public: addVisibility === 'public',
+          is_anonymous: addAnonymous,
           parent_id: resource.id,
         }),
       ).unwrap();
@@ -956,6 +964,19 @@ export default function ResourceDetailPage({
                   <span className="font-medium">Uploader:</span>{' '}
                   <UserLabel userId={resource.uploader_id} className="text-muted-foreground" />
                 </div>
+                {resource.is_anonymous && (
+                  <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <EyeOff className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                      Anonymous upload
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {resource.uploader_id === null
+                        ? 'The uploader chose not to be credited.'
+                        : 'Hidden from students — you can see the uploader because you are a moderator or above.'}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="font-medium">Visibility:</span>{" "}
                   <Badge
@@ -1046,6 +1067,7 @@ export default function ResourceDetailPage({
             fileInputRef={addFileInputRef}
             linkUrl=""
             visibility={addVisibility}
+            anonymous={addAnonymous}
             onTitleChange={setAddTitle}
             onDescriptionChange={setAddDescription}
             onFileChange={setAddFile}
@@ -1055,6 +1077,7 @@ export default function ResourceDetailPage({
             }}
             onLinkUrlChange={() => {}}
             onVisibilityChange={setAddVisibility}
+            onAnonymousChange={setAddAnonymous}
             onSubmitFile={handleUploadIntoDirectory}
             onSubmitLink={() => {}}
             onSubmitDirectory={handleCreateSubdirectory}
@@ -1127,6 +1150,17 @@ export default function ResourceDetailPage({
               <div className="space-y-2">
                 <Label>Visibility</Label>
                 <VisibilitySelect value={editVisibility} onChange={setEditVisibility} />
+              </div>
+              <div className="space-y-2">
+                {editingResource && (
+                  <AnonymizeField
+                    isAnonymous={editingResource.is_anonymous}
+                    isDirectory={editingResource.type === 'directory'}
+                    checked={editAnonymous}
+                    onChange={setEditAnonymous}
+                    id="detail-edit-anonymous"
+                  />
+                )}
               </div>
             </div>
             <AlertDialogFooter>

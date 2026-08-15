@@ -184,6 +184,41 @@ def inaccessible_resource_ids(db: Session, user: User) -> Select:
     return select(denied.c.id)
 
 
+def can_see_uploader(resource: Resource, user: User) -> bool:
+    """
+    True when `user` may be told who uploaded `resource`.
+
+    Anonymity hides the uploader from members only; moderator+ always see
+    through it, because someone has to be able to attach a takedown to a person.
+    Deliberately *not* keyed on ownership: an anonymous upload reads as
+    "Anonymous" to its own uploader too, so the row looks the same to them as it
+    does to everyone else and they cannot be identified by what only they see.
+    """
+    return not resource.is_anonymous or user.role >= int(UserRole.MODERATOR)
+
+
+def can_see_owner(resource: Resource, user: User) -> bool:
+    """
+    True when `user` may be told who owns `resource`.
+
+    On an anonymous upload the owner and the uploader are the same person, so
+    publishing the owner id would hand back the name that can_see_uploader just
+    withheld. The owner still sees their own id — the UI decides whether to
+    offer edit and delete controls by comparing it against the current user —
+    and moderator+ see it as they see everything else.
+
+    Redacted even once ownership has been transferred away, when the owner is
+    provably not the uploader. Revealing it only after a transfer would make the
+    field's absence a reliable signal that owner and uploader are still the same
+    person, which is most of what anonymity is meant to hide.
+    """
+    return (
+        not resource.is_anonymous
+        or user.role >= int(UserRole.MODERATOR)
+        or resource.owner_id == user.id
+    )
+
+
 def require_resource_access(db: Session, resource: Resource, user: User) -> None:
     """Raise 403 if user cannot access the resource."""
     if not check_resource_access(db, resource, user):

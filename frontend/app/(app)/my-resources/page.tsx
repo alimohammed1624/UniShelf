@@ -48,6 +48,7 @@ export default function MyResourcesPage() {
   const [file, setFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [visibility, setVisibility] = useState('public');
+  const [anonymous, setAnonymous] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
@@ -76,6 +77,7 @@ export default function MyResourcesPage() {
     formData.append('description', description);
     formData.append('file', file);
     formData.append('is_public', String(visibility === 'public'));
+    formData.append('is_anonymous', String(anonymous));
 
     try {
       const promise = dispatch(uploadResource(formData)).unwrap();
@@ -89,6 +91,7 @@ export default function MyResourcesPage() {
       setDescription('');
       setFile(null);
       setVisibility('public');
+      setAnonymous(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch {
       // handled by toast
@@ -100,7 +103,7 @@ export default function MyResourcesPage() {
     if (!linkUrl.trim()) return;
 
     try {
-      const promise = dispatch(submitLink({ title, description, url: linkUrl, is_public: visibility === 'public' })).unwrap();
+      const promise = dispatch(submitLink({ title, description, url: linkUrl, is_public: visibility === 'public', is_anonymous: anonymous })).unwrap();
       toast.promise(promise, {
         loading: 'Adding link...',
         success: 'Link added',
@@ -111,6 +114,7 @@ export default function MyResourcesPage() {
       setDescription('');
       setLinkUrl('');
       setVisibility('public');
+      setAnonymous(false);
     } catch {
       // handled by toast
     }
@@ -122,7 +126,7 @@ export default function MyResourcesPage() {
 
     try {
       const promise = dispatch(
-        createDirectory({ title, description, is_public: visibility === 'public' }),
+        createDirectory({ title, description, is_public: visibility === 'public', is_anonymous: anonymous }),
       ).unwrap();
       toast.promise(promise, {
         loading: 'Creating folder...',
@@ -133,6 +137,7 @@ export default function MyResourcesPage() {
       setTitle('');
       setDescription('');
       setVisibility('public');
+      setAnonymous(false);
     } catch {
       // handled by toast
     }
@@ -144,9 +149,9 @@ export default function MyResourcesPage() {
     await promise.catch(() => {});
   };
 
-  const handleEdit = async (id: number, t: string, desc: string, visibility: string) => {
+  const handleEdit = async (id: number, t: string, desc: string, visibility: string, anonymous: boolean) => {
     try {
-      const promise = dispatch(editResource({ id, title: t, description: desc, is_public: visibility === 'public' })).unwrap();
+      const promise = dispatch(editResource({ id, title: t, description: desc, is_public: visibility === 'public', is_anonymous: anonymous })).unwrap();
       toast.promise(promise, { loading: 'Saving...', success: 'Resource updated', error: 'Edit failed' });
       await promise;
       return true;
@@ -241,12 +246,14 @@ export default function MyResourcesPage() {
             fileInputRef={fileInputRef}
             linkUrl={linkUrl}
             visibility={visibility}
+            anonymous={anonymous}
             onTitleChange={setTitle}
             onDescriptionChange={setDescription}
             onFileChange={setFile}
             onRemoveFile={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
             onLinkUrlChange={setLinkUrl}
             onVisibilityChange={setVisibility}
+            onAnonymousChange={setAnonymous}
             onSubmitFile={handleUpload}
             onSubmitLink={handleSubmitLink}
             onSubmitDirectory={handleCreateDirectory}
