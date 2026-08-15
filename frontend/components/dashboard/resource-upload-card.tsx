@@ -5,7 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { VisibilitySelect } from '@/components/ui/visibility-select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+type UploadTab = 'file' | 'link' | 'directory';
+
+const TAB_LABELS: Record<UploadTab, string> = {
+  file: 'Upload File',
+  link: 'Add Link',
+  directory: 'New Folder',
+};
+
+const SUBMIT_LABELS: Record<UploadTab, string> = {
+  file: 'Upload',
+  link: 'Add Link',
+  directory: 'Create Folder',
+};
 
 interface ResourceUploadCardProps {
   title: string;
@@ -13,13 +28,21 @@ interface ResourceUploadCardProps {
   file: File | null;
   fileInputRef: RefObject<HTMLInputElement | null>;
   linkUrl: string;
+  visibility: string;
+  anonymous: boolean;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onFileChange: (file: File | null) => void;
   onRemoveFile: () => void;
   onLinkUrlChange: (value: string) => void;
+  onVisibilityChange: (value: string) => void;
+  onAnonymousChange: (value: boolean) => void;
   onSubmitFile: (e: FormEvent) => void;
   onSubmitLink: (e: FormEvent) => void;
+  onSubmitDirectory?: (e: FormEvent) => void;
+  tabs?: UploadTab[];
+  cardTitle?: string;
+  cardDescription?: string;
 }
 
 export function ResourceUploadCard({
@@ -28,51 +51,56 @@ export function ResourceUploadCard({
   file,
   fileInputRef,
   linkUrl,
+  visibility,
+  anonymous,
   onTitleChange,
   onDescriptionChange,
   onFileChange,
   onRemoveFile,
   onLinkUrlChange,
+  onVisibilityChange,
+  onAnonymousChange,
   onSubmitFile,
   onSubmitLink,
+  onSubmitDirectory,
+  tabs = ['file', 'link'],
+  cardTitle = 'Add Resource',
+  cardDescription = 'Upload a file, add a link, or create a folder.',
 }: ResourceUploadCardProps) {
-  const [tab, setTab] = useState<'file' | 'link'>('file');
+  const [tab, setTab] = useState<UploadTab>(tabs[0]);
   const fileSizeLabel = file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '';
 
   const handleSubmit = (e: FormEvent) => {
     if (tab === 'file') {
       onSubmitFile(e);
-    } else {
+    } else if (tab === 'link') {
       onSubmitLink(e);
+    } else {
+      onSubmitDirectory?.(e);
     }
   };
 
-  const canSubmit = tab === 'file' ? !!file : !!linkUrl.trim();
+  const canSubmit =
+    tab === 'file' ? !!file : tab === 'link' ? !!linkUrl.trim() : !!title.trim();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add Resource</CardTitle>
-        <CardDescription>Share notes, assignments, study material, or a web link.</CardDescription>
+        <CardTitle>{cardTitle}</CardTitle>
+        <CardDescription>{cardDescription}</CardDescription>
         <div className="flex gap-1 mt-2 border rounded-md p-1 w-fit">
-          <button
-            type="button"
-            onClick={() => setTab('file')}
-            className={`px-3 py-1 text-sm rounded transition-colors ${
-              tab === 'file' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-            }`}
-          >
-            Upload File
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('link')}
-            className={`px-3 py-1 text-sm rounded transition-colors ${
-              tab === 'link' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-            }`}
-          >
-            Add Link
-          </button>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`px-3 py-1 text-sm rounded transition-colors ${
+                tab === t ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+              }`}
+            >
+              {TAB_LABELS[t]}
+            </button>
+          ))}
         </div>
       </CardHeader>
       <CardContent>
@@ -96,6 +124,29 @@ export function ResourceUploadCard({
               onChange={(e) => onDescriptionChange(e.target.value)}
               rows={4}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="resource-visibility">Visibility</Label>
+            <VisibilitySelect
+              id="resource-visibility"
+              value={visibility}
+              onChange={onVisibilityChange}
+            />
+          </div>
+          <div className="rounded-lg border bg-muted/35 p-3">
+            <label htmlFor="resource-anonymous" className="flex cursor-pointer items-center gap-2.5">
+              <input
+                id="resource-anonymous"
+                type="checkbox"
+                checked={anonymous}
+                onChange={(e) => onAnonymousChange(e.target.checked)}
+                className="h-4 w-4 shrink-0 accent-primary"
+              />
+              <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span className="text-sm font-medium leading-none">Upload anonymously</span>
+                <span className="text-xs text-muted-foreground leading-none">This cannot be undone.</span>
+              </span>
+            </label>
           </div>
 
           {/* Tab-specific field */}
@@ -134,7 +185,7 @@ export function ResourceUploadCard({
                 </div>
               </div>
             </div>
-          ) : (
+          ) : tab === 'link' ? (
             <div key="link-section" className="space-y-2">
               <Label htmlFor="link-url">URL</Label>
               <Input
@@ -146,11 +197,15 @@ export function ResourceUploadCard({
                 required
               />
             </div>
+          ) : (
+            <p key="directory-section" className="text-sm text-muted-foreground">
+              Creates an empty folder. You can add files and subfolders to it afterwards.
+            </p>
           )}
 
           <div className="flex justify-end">
             <Button type="submit" disabled={!canSubmit}>
-              {tab === 'file' ? 'Upload' : 'Add Link'}
+              {SUBMIT_LABELS[tab]}
             </Button>
           </div>
         </form>

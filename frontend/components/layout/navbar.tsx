@@ -22,7 +22,12 @@ const ADMIN_LINKS = [
   { href: '/superadmin', label: 'Superadmin', icon: ShieldCheck, role: 3 },
 ];
 
-export function Navbar() {
+/**
+ * `containerClassName` exists so the landing page can widen the bar to match
+ * its own max-w-6xl content. cn() runs through tailwind-merge, so a max-w-*
+ * passed in replaces the default rather than fighting it.
+ */
+export function Navbar({ containerClassName }: { containerClassName?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -30,14 +35,27 @@ export function Navbar() {
 
   const handleLogout = () => {
     dispatch(logout());
-    router.push('/login');
+    // Landing page, not /login: signing out is not a request to sign back in.
+    // The guard in (app)/layout.tsx still sends you to /login if you try to
+    // reach a protected page without a session.
+    router.push('/');
     toast.success('Logged out successfully');
   };
 
   return (
     <header className="sticky top-0 z-50 border-b border-[oklch(0.68_0.14_75/18%)] bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <span className="brand-logo text-lg font-bold tracking-tight">UniShelf</span>
+      <div
+        className={cn(
+          'mx-auto flex max-w-5xl items-center justify-between px-4 py-3',
+          containerClassName
+        )}
+      >
+        <Link
+          href="/"
+          className="brand-logo text-lg font-bold tracking-tight transition-opacity hover:opacity-80"
+        >
+          UniShelf
+        </Link>
         <nav className="flex items-center gap-1">
           {NAV_LINKS.map(({ href, label, icon: Icon }) => (
             <Link

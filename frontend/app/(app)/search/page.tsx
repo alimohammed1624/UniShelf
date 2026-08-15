@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { ResourceTableCard } from '@/components/dashboard/resource-table-card';
 import { AdvancedFilters, AdvancedFilterState } from '@/components/search/AdvancedFilters';
+import { matchesResourceCategory } from '@/lib/resource-categories';
 import {
   fetchResources,
   downloadResource,
@@ -205,14 +206,9 @@ function SearchPageContent() {
     }
 
     if (advancedFilters.resourceTypes.length > 0) {
-      const matchesType = advancedFilters.resourceTypes.some((typeId) => {
-        if (typeId === 'pdf' && r.type === 'application/pdf') return true;
-        if (typeId === 'video' && r.type?.startsWith('video/')) return true;
-        if (typeId === 'image' && r.type?.startsWith('image/')) return true;
-        if (typeId === 'code' && r.type?.startsWith('text/')) return true;
-        if (typeId === 'link' && r.type === 'link') return true;
-        return false;
-      });
+      const matchesType = advancedFilters.resourceTypes.some((typeId) =>
+        matchesResourceCategory(r, typeId)
+      );
       if (!matchesType) return false;
     }
 
@@ -275,9 +271,9 @@ function SearchPageContent() {
     await promise.catch(() => {});
   };
 
-  const handleEdit = async (id: number, title: string, desc: string, visibility: string) => {
+  const handleEdit = async (id: number, title: string, desc: string, visibility: string, anonymous: boolean) => {
     try {
-      const promise = dispatch(editResource({ id, title, description: desc, is_public: visibility === 'public' })).unwrap();
+      const promise = dispatch(editResource({ id, title, description: desc, is_public: visibility === 'public', is_anonymous: anonymous })).unwrap();
       toast.promise(promise, { loading: 'Saving...', success: 'Resource updated', error: 'Edit failed' });
       await promise;
       return true;
@@ -355,7 +351,7 @@ function SearchPageContent() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold mb-2">Search Resources</h1>
         <p className="text-muted-foreground">
-          Find academic materials with advanced filtering and search
+          Find documents across your organisation with advanced filtering and search
         </p>
           {/* Search Input */}
           <Input

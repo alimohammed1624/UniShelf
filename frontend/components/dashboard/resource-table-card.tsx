@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserLabel } from '@/components/ui/user-label';
+import { AnonymizeField } from '@/components/ui/anonymize-field';
+import { VisibilitySelect } from '@/components/ui/visibility-select';
 import {
   Table,
   TableBody,
@@ -49,7 +51,7 @@ interface ResourceTableCardProps {
   currentUserRole: number;
   allTags: Tag[];
   onDownload: (id: number, title: string) => void;
-  onEdit: (id: number, title: string, description: string, visibility: string) => Promise<boolean>;
+  onEdit: (id: number, title: string, description: string, visibility: string, anonymous: boolean) => Promise<boolean>;
   onDelete: (id: number) => Promise<boolean>;
   onChangeFile: (id: number, file: globalThis.File) => Promise<boolean>;
   onCreateTag: (name: string) => Promise<Tag | null>;
@@ -87,6 +89,7 @@ export function ResourceTableCard({
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editVisibility, setEditVisibility] = useState('public');
+  const [editAnonymous, setEditAnonymous] = useState(false);
 
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -170,12 +173,13 @@ export function ResourceTableCard({
     setEditTitle(resource.title);
     setEditDescription(resource.description || '');
     setEditVisibility(resource.is_public ? 'public' : 'private');
+    setEditAnonymous(false);
   };
 
   const handleEditSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingResource) return;
-    const success = await onEdit(editingResource.id, editTitle, editDescription, editVisibility);
+    const success = await onEdit(editingResource.id, editTitle, editDescription, editVisibility, editAnonymous);
     if (success) setEditingResource(null);
   };
 
@@ -471,15 +475,16 @@ export function ResourceTableCard({
               </div>
               <div className="space-y-2">
                 <Label>Visibility</Label>
-                <select
-                  value={editVisibility}
-                  onChange={(e) => setEditVisibility(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                </select>
+                <VisibilitySelect value={editVisibility} onChange={setEditVisibility} />
               </div>
+              {editingResource && (
+                <AnonymizeField
+                  isAnonymous={editingResource.is_anonymous}
+                  isDirectory={editingResource.type === 'directory'}
+                  checked={editAnonymous}
+                  onChange={setEditAnonymous}
+                />
+              )}
             </div>
 
             <AlertDialogFooter>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { User } from 'lucide-react';
+import { User, UserRoundX } from 'lucide-react';
 import api from '@/lib/api';
 
 interface PublicProfile {
@@ -41,8 +41,8 @@ function firstName(fullName: string): string {
 }
 
 interface UserLabelProps {
-  /** The numeric user ID to display */
-  userId: number;
+  /** The numeric user ID to display. Null when the API withheld it. */
+  userId: number | null;
   /**
    * Optional pre-loaded data (e.g. from admin user list).
    * When supplied, no API call is made.
@@ -54,10 +54,18 @@ interface UserLabelProps {
 /**
  * Renders the uploader's first name with a styled CSS tooltip
  * showing their email (when available) on hover.
+ *
+ * A null `userId` means the viewer is not allowed to know who this is — an
+ * anonymous upload seen by a member. That renders as a plain "Anonymous" pill
+ * with no fetch and no tooltip. The check keys off the missing id rather than a
+ * separate flag so the component cannot be talked into revealing a name the API
+ * never sent.
  */
 export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
+  const anonymous = userId === null;
+
   const [profile, setProfile] = useState<PublicProfile | null>(
-    profileCache.get(userId) ?? null,
+    userId !== null ? profileCache.get(userId) ?? null : null,
   );
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -66,7 +74,7 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
   const wrapperRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (preloaded) return;
+    if (preloaded || userId === null) return;
     if (profileCache.has(userId)) {
       setProfile(profileCache.get(userId)!);
       return;
@@ -80,16 +88,21 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
 
   const resolvedFullName = preloaded?.full_name ?? profile?.full_name ?? null;
   const resolvedEmail    = preloaded?.email    ?? profile?.email    ?? null;
-  const displayName = resolvedFullName ? firstName(resolvedFullName) : '';
+  const displayName = anonymous
+    ? 'Anonymous'
+    : resolvedFullName ? firstName(resolvedFullName) : '';
 
   // Tooltip: show email when available (name is already visible on screen).
   // Fall back to full name when it adds info beyond the displayed first name.
+  // Anonymous labels never get one — there is nothing to reveal.
   const tooltipContent: string | null =
-    resolvedEmail
-      ? resolvedEmail
-      : resolvedFullName && resolvedFullName !== displayName
-        ? resolvedFullName
-        : null;
+    anonymous
+      ? null
+      : resolvedEmail
+        ? resolvedEmail
+        : resolvedFullName && resolvedFullName !== displayName
+          ? resolvedFullName
+          : null;
 
   const handleMouseEnter = () => {
     if (!tooltipContent || !wrapperRef.current) return;
@@ -107,9 +120,20 @@ export function UserLabel({ userId, preloaded, className }: UserLabelProps) {
 
   return (
     <span ref={wrapperRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className={`inline-flex items-center gap-1 ${className ?? ''}`}>
-      {/* Icon + name pill */}
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[oklch(0.78_0.14_75)] bg-[oklch(0.68_0.14_75/12%)] text-xs font-medium transition-colors hover:bg-[oklch(0.68_0.14_75/22%)] cursor-default select-none">
-        <User className="h-3 w-3 opacity-70 shrink-0" />
+      {/* Icon + name pill. Anonymous wears a muted variant so it reads as an
+          absence of attribution rather than as a user named "Anonymous". */}
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium transition-colors cursor-default select-none ${
+          anonymous
+            ? 'text-muted-foreground bg-muted/60 italic'
+            : 'text-[oklch(0.78_0.14_75)] bg-[oklch(0.68_0.14_75/12%)] hover:bg-[oklch(0.68_0.14_75/22%)]'
+        }`}
+      >
+        {anonymous ? (
+          <UserRoundX className="h-3 w-3 opacity-70 shrink-0" />
+        ) : (
+          <User className="h-3 w-3 opacity-70 shrink-0" />
+        )}
         {displayName}
       </span>
 

@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional, List
 import re
 
+from app.utils.db_helpers import can_see_owner, can_see_uploader
+
 
 # ── Tag brief (for embedding in resource responses) ──────────
 
@@ -30,8 +32,8 @@ class ResourceSchema(BaseModel):
     type: str
     is_public: bool
     is_anonymous: bool
-    uploader_id: int
-    owner_id: int
+    uploader_id: Optional[int] = None  # Null when redacted — see for_viewer()
+    owner_id: Optional[int] = None  # Null when redacted — see for_viewer()
     is_archived: bool
     archived_at: Optional[datetime] = None
     archived_by_id: Optional[int] = None
@@ -44,6 +46,52 @@ class ResourceSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def for_viewer(cls, resource, viewer) -> "ResourceSchema":
+        """
+        Serialize a resource as `viewer` is allowed to see it.
+
+        Anonymity is enforced here rather than in the client: withholding the id
+        is what makes it real, since /users/{id} will answer for any id that
+        leaves the building. `is_anonymous` still ships, so the UI knows to
+        render "Anonymous" rather than an absent uploader.
+
+        Both people-shaped columns are covered. On an anonymous upload the owner
+        starts out as the uploader, so redacting one and publishing the other
+        would leave the name a single lookup away.
+        """
+        schema = cls.model_validate(resource)
+        if not can_see_uploader(resource, viewer):
+            schema.uploader_id = None
+        if not can_see_owner(resource, viewer):
+            schema.owner_id = None
+        return schema
+
+
+class DirectoryCreate(BaseModel):
+    title: str
+    description: str = ""
+    is_public: bool = True
+    is_anonymous: bool = False
+    parent_id: Optional[int] = None
+
+    @field_validator("title")
+    @classmethod
+    def title_length(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Title cannot be empty")
+        if len(v) > 255:
+            raise ValueError("Title must be at most 255 characters")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def description_length(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Description must be at most 2000 characters")
+        return v
 
 
 class ResourceUpdate(BaseModel):

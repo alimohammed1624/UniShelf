@@ -30,6 +30,9 @@ services:
       # bind-mounted ./backend) — the repo-root .env is NOT visible in the
       # container, so this passthrough is what actually delivers the key.
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # Same reason as above: without this passthrough the backend never sees
+      # the value and every instance silently accepts any email domain.
+      - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
     depends_on:
       db:
         condition: service_healthy

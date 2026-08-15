@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "UniShelf",
-  description: "Academic resource sharing platform for university students",
+  description: "Central document storage and sharing for your organisation",
 };
 
 export default function RootLayout({

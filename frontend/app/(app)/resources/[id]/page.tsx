@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, EyeOff } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { Resource, TagBrief } from '@/types';
 import api from '@/lib/api';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserLabel } from '@/components/ui/user-label';
+import { AnonymizeField } from '@/components/ui/anonymize-field';
 import { Dirtree } from '@/components/dirtree/Dirtree';
 import { useResourceTree } from '@/hooks/useResourceTree';
 import {
@@ -26,13 +27,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { VisibilitySelect } from "@/components/ui/visibility-select";
 import { toast } from "sonner";
 import {
   editResource,
   deleteResource,
   changeResourceFile,
   downloadResource,
+  uploadResource,
+  createDirectory,
 } from '@/lib/features/resources/resourceSlice';
+import { ResourceUploadCard } from '@/components/dashboard/resource-upload-card';
 import {
   createTag,
   assignTagsToResource,
@@ -41,6 +46,8 @@ import {
 import { submitReport } from "@/lib/features/moderate/moderateSlice";
 import { toggleBookmarkAsync } from "@/lib/features/bookmarks/bookmarksSlice";
 import { PdfPreview } from "@/components/resources/pdf-preview";
+import { VideoPreview, detectVideoSource } from "@/components/resources/video-preview";
+import { CodePreview } from "@/components/resources/code-preview";
 
 export default function ResourceDetailPage({
   params,
@@ -64,6 +71,7 @@ export default function ResourceDetailPage({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editVisibility, setEditVisibility] = useState("public");
+  const [editAnonymous, setEditAnonymous] = useState(false);
 
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -100,12 +108,21 @@ export default function ResourceDetailPage({
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+  const [videoFullscreen, setVideoFullscreen] = useState(false);
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
-  const { data: treeData, loading: treeLoading } = useResourceTree({
+  const { data: treeData, loading: treeLoading, refetch: refetchTree } = useResourceTree({
     resourceId,
   });
+
+  // Add-contents form state (create subdirectory / upload file into this directory)
+  const [addTitle, setAddTitle] = useState('');
+  const [addDescription, setAddDescription] = useState('');
+  const [addFile, setAddFile] = useState<File | null>(null);
+  const [addVisibility, setAddVisibility] = useState('public');
+  const [addAnonymous, setAddAnonymous] = useState(false);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,8 +180,10 @@ export default function ResourceDetailPage({
     setPdfPreviewFailed(false);
     setPdfBlobUrl(null);
     pdfDocRef.current = null;
+    setPdfFullscreen(false);
     setImageZoom(100);
     setImageFullscreen(false);
+    setVideoFullscreen(false);
     setImageBlobUrl(null);
     setImageLoading(false);
     setImagePreviewFailed(false);
@@ -177,6 +196,7 @@ export default function ResourceDetailPage({
     setEditTitle(res.title);
     setEditDescription(res.description || "");
     setEditVisibility(res.is_public ? "public" : "private");
+    setEditAnonymous(false);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -188,6 +208,7 @@ export default function ResourceDetailPage({
         title: editTitle,
         description: editDescription,
         is_public: editVisibility === "public",
+        is_anonymous: editAnonymous,
       }),
     ).unwrap();
     toast.promise(promise, {
@@ -363,18 +384,83 @@ export default function ResourceDetailPage({
     promise.catch(() => {});
   };
 
+  // ── Add-to-directory handlers ────────────────────────────
+
+  const resetAddForm = () => {
+    setAddTitle('');
+    setAddDescription('');
+    setAddFile(null);
+    setAddVisibility('public');
+    setAddAnonymous(false);
+    if (addFileInputRef.current) addFileInputRef.current.value = '';
+  };
+
+  const handleUploadIntoDirectory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resource || !addFile) return;
+    const formData = new FormData();
+    formData.append('title', addTitle);
+    formData.append('description', addDescription);
+    formData.append('file', addFile);
+    formData.append('is_public', String(addVisibility === 'public'));
+    formData.append('is_anonymous', String(addAnonymous));
+    formData.append('parent_id', String(resource.id));
+
+    try {
+      const promise = dispatch(uploadResource(formData)).unwrap();
+      toast.promise(promise, {
+        loading: 'Uploading...',
+        success: 'Upload successful',
+        error: (err) => (typeof err === 'string' ? err : 'Upload failed'),
+      });
+      await promise;
+      resetAddForm();
+      refetchTree();
+    } catch {
+      // handled by toast
+    }
+  };
+
+  const handleCreateSubdirectory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resource || !addTitle.trim()) return;
+
+    try {
+      const promise = dispatch(
+        createDirectory({
+          title: addTitle,
+          description: addDescription,
+          is_public: addVisibility === 'public',
+          is_anonymous: addAnonymous,
+          parent_id: resource.id,
+        }),
+      ).unwrap();
+      toast.promise(promise, {
+        loading: 'Creating folder...',
+        success: 'Folder created',
+        error: (err) => (typeof err === 'string' ? err : 'Failed to create folder'),
+      });
+      await promise;
+      resetAddForm();
+      refetchTree();
+    } catch {
+      // handled by toast
+    }
+  };
+
   // ── Preview helpers ──────────────────────────────────────
 
   const apiDownloadPath = resource ? `/resources/${resource.id}/download` : '';
   const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
   const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
-  const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
-  const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
+  const isPreviewFullscreen = pdfFullscreen || imageFullscreen || videoFullscreen;
 
   const isPdf = resource?.type === "application/pdf";
   const isImage = resource?.type?.startsWith("image/");
   const isText = resource?.type?.startsWith("text/");
-  const canPreview = isPdf || isImage || isText;
+  const videoSource = detectVideoSource(resource?.type, resource?.file_path, apiInlinePath);
+  const isVideo = videoSource !== null;
+  const canPreview = isPdf || isImage || isText || isVideo;
   const isFirstPdfPage = pdfPage <= 1;
   // Disable Next while page count is unknown (loading) OR when on the last page
   const isLastPdfPage = !pdfNumPages || pdfPage >= pdfNumPages;
@@ -614,7 +700,7 @@ export default function ResourceDetailPage({
       </Button>
 
       <div
-        className={`grid grid-cols-1 gap-6 ${imageFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
+        className={`grid grid-cols-1 gap-6 ${isPreviewFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
       >
         {/* ── Left column: Preview ─────────────────────────── */}
         {canPreview ? (
@@ -686,7 +772,7 @@ export default function ResourceDetailPage({
                       variant="secondary"
                       onClick={() => setPdfFullscreen((prev) => !prev)}
                     >
-                      {pdfFullscreen ? 'Exit full screen' : 'Full screen'}
+                      {pdfFullscreen ? 'Exit expand' : 'Expand'}
                     </Button>
                   </div>
 
@@ -758,7 +844,7 @@ export default function ResourceDetailPage({
                       variant="secondary"
                       onClick={() => setImageFullscreen((prev) => !prev)}
                     >
-                      {imageFullscreen ? "Exit full screen" : "Full screen"}
+                      {imageFullscreen ? "Exit expand" : "Expand"}
                     </Button>
                   </div>
                   <div
@@ -786,13 +872,21 @@ export default function ResourceDetailPage({
                   </div>
                 </div>
               )}
-              {isText && <TextPreview url={apiDownloadPath} />}
+              {isVideo && videoSource && (
+                <VideoPreview
+                  kind={videoSource.kind}
+                  src={videoSource.src}
+                  fullscreen={videoFullscreen}
+                  onToggleFullscreen={() => setVideoFullscreen((prev) => !prev)}
+                />
+              )}
+              {isText && <CodePreview url={apiDownloadPath} filename={resource.filename} />}
             </CardContent>
           </Card>
         ) : null}
 
         {/* ── Right column: Metadata ───────────────────────── */}
-        {!imageFullscreen && (
+        {!isPreviewFullscreen && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Details</CardTitle>
@@ -822,18 +916,22 @@ export default function ResourceDetailPage({
               </div>
 
               <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Filename:</span>{" "}
-                  <span className="text-muted-foreground">
-                    {resource.filename ?? "—"}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Size:</span>{" "}
-                  <span className="text-muted-foreground">
-                    {formatSize(resource.size)}
-                  </span>
-                </div>
+                {resource.type !== "directory" && (
+                  <>
+                    <div>
+                      <span className="font-medium">Filename:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {resource.filename ?? "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Size:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {formatSize(resource.size)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div>
                   <span className="font-medium">Type:</span>{" "}
                   <span className="text-muted-foreground">{resource.type}</span>
@@ -866,6 +964,19 @@ export default function ResourceDetailPage({
                   <span className="font-medium">Uploader:</span>{' '}
                   <UserLabel userId={resource.uploader_id} className="text-muted-foreground" />
                 </div>
+                {resource.is_anonymous && (
+                  <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <EyeOff className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                      Anonymous upload
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {resource.uploader_id === null
+                        ? 'The uploader chose not to be credited.'
+                        : 'Hidden from students — you can see the uploader because you are a moderator or above.'}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="font-medium">Visibility:</span>{" "}
                   <Badge
@@ -923,7 +1034,7 @@ export default function ResourceDetailPage({
           <Button variant="outline" onClick={() => openEditModal(resource)}>
             Edit
           </Button>
-          {resource.type !== "link" && (
+          {resource.type !== "link" && resource.type !== "directory" && (
             <Button
               variant="outline"
               onClick={() => setChangingResource(resource)}
@@ -946,12 +1057,43 @@ export default function ResourceDetailPage({
         </div>
       )}
 
+      {/* ── Add contents (owner/admin only, directories only) ── */}
+      {resource.type === "directory" &&
+        (resource.owner_id === user?.id || (user && user.role >= 2)) && (
+          <ResourceUploadCard
+            title={addTitle}
+            description={addDescription}
+            file={addFile}
+            fileInputRef={addFileInputRef}
+            linkUrl=""
+            visibility={addVisibility}
+            anonymous={addAnonymous}
+            onTitleChange={setAddTitle}
+            onDescriptionChange={setAddDescription}
+            onFileChange={setAddFile}
+            onRemoveFile={() => {
+              setAddFile(null);
+              if (addFileInputRef.current) addFileInputRef.current.value = '';
+            }}
+            onLinkUrlChange={() => {}}
+            onVisibilityChange={setAddVisibility}
+            onAnonymousChange={setAddAnonymous}
+            onSubmitFile={handleUploadIntoDirectory}
+            onSubmitLink={() => {}}
+            onSubmitDirectory={handleCreateSubdirectory}
+            tabs={['file', 'directory']}
+            cardTitle="Add to This Folder"
+            cardDescription="Upload a file or create a subfolder here."
+          />
+        )}
+
       {/* ── Resource tree ──────────────────────────────────── */}
       {treeData && (
         <Dirtree
           parents={treeData.parents}
           children={treeData.children}
           currentId={resource.id}
+          currentTitle={resource.title}
         />
       )}
       {treeLoading && (
@@ -1007,14 +1149,18 @@ export default function ResourceDetailPage({
               </div>
               <div className="space-y-2">
                 <Label>Visibility</Label>
-                <select
-                  value={editVisibility}
-                  onChange={(e) => setEditVisibility(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                </select>
+                <VisibilitySelect value={editVisibility} onChange={setEditVisibility} />
+              </div>
+              <div className="space-y-2">
+                {editingResource && (
+                  <AnonymizeField
+                    isAnonymous={editingResource.is_anonymous}
+                    isDirectory={editingResource.type === 'directory'}
+                    checked={editAnonymous}
+                    onChange={setEditAnonymous}
+                    id="detail-edit-anonymous"
+                  />
+                )}
               </div>
             </div>
             <AlertDialogFooter>
@@ -1242,42 +1388,6 @@ export default function ResourceDetailPage({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-// ── Text preview sub-component (separate to avoid re-renders) ──
-
-function TextPreview({ url }: { url: string }) {
-  const [text, setText] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get(url, { responseType: "text" })
-      .then((res) => {
-        if (!cancelled) setText(res.data);
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [url]);
-
-  if (error || text === null) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        Failed to load preview
-      </div>
-    );
-  }
-
-  return (
-    <pre className="bg-muted p-4 rounded-md overflow-auto max-h-[60vh] whitespace-pre-wrap text-sm font-mono">
-      {text}
-    </pre>
   );
 }
 

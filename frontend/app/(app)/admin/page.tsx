@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchUsers, fetchResources, deleteResource } from '@/lib/features/admin/adminSlice';
@@ -128,10 +128,20 @@ function OverviewPanel() {
   );
 }
 
-const ROLE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All roles' },
-  ...ROLE_OPTIONS.map((o) => ({ value: String(o.value), label: o.label })),
-];
+/**
+ * Role filters stop at the viewer's own rank, matching what the API will
+ * return — offering "Super Admin" to an admin would only ever yield an empty
+ * table. Mirrors the same cap in `RoleChangeDialog`.
+ */
+function roleFilterOptions(actorRole: number) {
+  return [
+    { value: 'all', label: 'All roles' },
+    ...ROLE_OPTIONS.filter((o) => o.value <= actorRole).map((o) => ({
+      value: String(o.value),
+      label: o.label,
+    })),
+  ];
+}
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -150,6 +160,8 @@ function UsersPanel() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+
+  const roleOptions = useMemo(() => roleFilterOptions(actorRole), [actorRole]);
 
   // Re-query the server whenever a filter changes (debounced for the search box)
   useEffect(() => {
@@ -181,7 +193,7 @@ function UsersPanel() {
             placeholder="Search name or email"
             className="h-8 max-w-xs"
           />
-          <ThemeSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTER_OPTIONS} />
+          <ThemeSelect value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
           <ThemeSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
         </div>
 
@@ -393,7 +405,7 @@ function ResourcesPanel() {
               <td className="py-2 pr-4 text-muted-foreground">
                 <UserLabel
                   userId={resource.owner_id}
-                  preloaded={userMap.get(resource.owner_id)}
+                  preloaded={resource.owner_id !== null ? userMap.get(resource.owner_id) : undefined}
                 />
               </td>
               <td className="py-2 pr-4">

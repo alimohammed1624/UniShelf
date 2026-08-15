@@ -33,6 +33,19 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    # Registration scope
+    # Comma-separated list of email domains allowed to register, mirroring the
+    # CORS_ORIGINS idiom above. Each deployment of UniShelf serves one
+    # organisation, so this is what makes an instance that organisation's —
+    # the way a Moodle or ERP install is bound to its own institution.
+    #
+    # Blank means "accept any domain". That is an open instance, not a
+    # misconfigured one, so it is allowed rather than fatal: a required field
+    # would crash the app at import for anyone bringing the stack up before
+    # they have decided on a domain. env.example ships a real value so the
+    # default path is still a restricted instance.
+    ALLOWED_EMAIL_DOMAINS: str = ""
+
     # Upload limits
     MAX_UPLOAD_SIZE_MB: int = 500
 

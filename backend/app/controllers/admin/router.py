@@ -15,9 +15,10 @@ from app.controllers.auth.helpers import (
     assert_can_change_role,
     generate_temp_password,
     get_password_hash,
-    EDU_EMAIL_RE,
+    assert_email_allowed,
 )
 from app.controllers.resources.schemas import ResourceSchema
+from app.utils.db_helpers import inaccessible_resource_ids
 from app.utils.minio_client import delete_file
 from app.utils.thumbnails import thumbnail_object_key
 from .schemas import (
@@ -41,8 +42,16 @@ def list_all_resources(
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    """List all resources including archived ones, with anonymous uploaders visible."""
+    """
+    List all resources including archived ones, with anonymous uploaders visible.
+
+    "All" still stops at rank: the private resources of owners at or above the
+    caller's own role are filtered out, so this endpoint cannot be used to read
+    past the limit that applies everywhere else.
+    """
     query = db.query(Resource).options(selectinload(Resource.tags))
+
+    query = query.filter(Resource.id.not_in(inaccessible_resource_ids(db, current_user)))
 
     if not include_archived:
         query = query.filter(Resource.is_archived == False)
@@ -94,10 +103,18 @@ def list_all_users(
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    """List all users with full details, including moderation metadata."""
+    """
+    List all users with full details, including moderation metadata.
+
+    Rank caps the listing: users ranked strictly above the caller are left out,
+    so an admin's dashboard never surfaces a superadmin. Peers stay visible —
+    they are part of the picture an admin needs — but `assert_can_manage` still
+    refuses every action on them. The cap keys off the caller's own role rather
+    than naming SUPERADMIN, so the same endpoint serves both dashboards.
+    """
     _sweep_expired_bans(db)
 
-    query = db.query(User)
+    query = db.query(User).filter(User.role <= current_user.role)
 
     if role is not None:
         query = query.filter(User.role == role)
@@ -129,11 +146,7 @@ def create_managed_user(
     db: Session = Depends(get_db),
 ):
     """Create a user at any role up to the creator's own. Superadmin only."""
-    if not EDU_EMAIL_RE.match(payload.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must use a valid university email address (.edu)",
-        )
+    assert_email_allowed(payload.email)
 
     if payload.role > current_user.role:
         raise HTTPException(

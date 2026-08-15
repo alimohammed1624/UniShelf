@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { RESOURCE_CATEGORIES } from '@/lib/resource-categories';
 
 export interface AdvancedFilterState {
   searchQuery: string;
@@ -23,13 +24,13 @@ interface AdvancedFiltersProps {
   suggestionsLoading?: boolean;
 }
 
-const RESOURCE_TYPES = [
-  { id: 'pdf', label: 'PDF', mime: 'application/pdf' },
-  { id: 'video', label: 'Video', mime: 'video/' },
-  { id: 'image', label: 'Image', mime: 'image/' },
-  { id: 'code', label: 'Code', mime: 'text/' },
-  { id: 'link', label: 'Link', mime: 'link' },
-];
+const MONTH_NAMES = Array.from({ length: 12 }, (_, index) =>
+  new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(2000, index, 1)),
+);
+
+// Resources can only have been uploaded in the past, so the picker offers the
+// current year and the 29 before it rather than an open-ended range.
+const YEAR_RANGE = 30;
 
 export function AdvancedFilters({
   filters,
@@ -89,8 +90,10 @@ export function AdvancedFilters({
     setTagQuery('');
   };
 
+  // overflow-visible: Card clips by default, which would cut off the date
+  // picker's dropdowns where they extend past the bottom of the card.
   return (
-    <Card className="h-fit sticky top-4">
+    <Card className="h-fit sticky top-4 overflow-visible">
       <CardContent className="space-y-4">
         {/* Tags */}
         {(allTags.length > 0 || showSuggestions) && (
@@ -210,7 +213,7 @@ export function AdvancedFilters({
           onClear={() => onFilterChange({ ...filters, resourceTypes: [] })}
         >
           <div className="flex flex-wrap gap-2">
-            {RESOURCE_TYPES.map((type) => {
+            {RESOURCE_CATEGORIES.map((type) => {
               const isSelected = filters.resourceTypes.includes(type.id);
 
               return (
@@ -274,6 +277,14 @@ function DateRangeCalendar({ month, range, onMonthChange, onSelect }: DateRangeC
   const days = Array.from({ length: firstDay + daysInMonth }, (_, index) =>
     index < firstDay ? null : index - firstDay + 1,
   );
+  // The window stretches to cover the year in view, so a date restored from the
+  // URL — or reached with the chevrons — is never missing from the dropdown.
+  const latestYear = Math.max(new Date().getFullYear(), year);
+  const earliestYear = Math.min(new Date().getFullYear() - YEAR_RANGE + 1, year);
+  const years = Array.from(
+    { length: latestYear - earliestYear + 1 },
+    (_, index) => latestYear - index,
+  );
 
   return (
     <div className="space-y-3">
@@ -288,9 +299,22 @@ function DateRangeCalendar({ month, range, onMonthChange, onSelect }: DateRangeC
         >
           <ChevronLeft className="size-4" />
         </Button>
-        <span className="text-sm font-medium">
-          {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month)}
-        </span>
+        <div className="flex items-center gap-1">
+          <PickerDropdown
+            label={MONTH_NAMES[monthIndex]}
+            ariaLabel="Select month"
+            value={monthIndex}
+            options={MONTH_NAMES.map((name, index) => ({ value: index, label: name }))}
+            onSelect={(nextMonth) => onMonthChange(new Date(year, nextMonth, 1))}
+          />
+          <PickerDropdown
+            label={String(year)}
+            ariaLabel="Select year"
+            value={year}
+            options={years.map((option) => ({ value: option, label: String(option) }))}
+            onSelect={(nextYear) => onMonthChange(new Date(nextYear, monthIndex, 1))}
+          />
+        </div>
         <Button
           type="button"
           variant="ghost"
@@ -335,6 +359,101 @@ function DateRangeCalendar({ month, range, onMonthChange, onSelect }: DateRangeC
         })}
       </div>
 
+    </div>
+  );
+}
+
+interface PickerDropdownProps {
+  label: string;
+  ariaLabel: string;
+  value: number;
+  options: { value: number; label: string }[];
+  onSelect: (value: number) => void;
+}
+
+// Same hand-rolled listbox as the upload card's visibility select — a native
+// <select> would drop back to the unthemed contrast that was fixed there.
+function PickerDropdown({ label, ariaLabel, value, options, onSelect }: PickerDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
+  // Open the list scrolled to the current selection. Setting scrollTop rather
+  // than calling scrollIntoView, which would scroll the page as well.
+  useEffect(() => {
+    const list = listRef.current;
+    const selected = selectedRef.current;
+    if (!open || !list || !selected) return;
+
+    list.scrollTop = selected.offsetTop - (list.clientHeight - selected.offsetHeight) / 2;
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((isOpen) => !isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${ariaLabel} (${label})`}
+        className="flex items-center gap-1 rounded-sm px-2 py-1 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {label}
+        <ChevronDown className="size-3 opacity-50" aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          ref={listRef}
+          // Opens downward, which for the last filter section means spilling
+          // past the card — hence the overflow-visible override on <Card>.
+          className="absolute left-1/2 top-full z-20 mt-1 max-h-48 w-28 -translate-x-1/2 overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                ref={isSelected ? selectedRef : undefined}
+                onClick={() => {
+                  onSelect(option.value);
+                  setOpen(false);
+                }}
+                className={`w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted ${
+                  isSelected ? 'bg-muted font-medium' : ''
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

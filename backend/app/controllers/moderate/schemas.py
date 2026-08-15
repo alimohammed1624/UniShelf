@@ -2,12 +2,14 @@ from pydantic import BaseModel, field_validator
 from datetime import datetime
 from typing import Optional
 
+from app.utils.db_helpers import can_see_uploader
+
 
 class ResourceBrief(BaseModel):
     id: int
     title: str
     filename: Optional[str] = None
-    uploader_id: int
+    uploader_id: Optional[int] = None  # Null when redacted — see redact_report_uploader
     is_archived: bool
 
     class Config:
@@ -42,3 +44,17 @@ class ReportSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def redact_report_uploader(report_schema, resource, viewer):
+    """
+    Blank the nested uploader on a report the viewer is not allowed to trace.
+
+    Reporting is open to every member, so the report responses hand a resource
+    brief back to the one caller who is not a moderator. Mirrors
+    ResourceSchema.for_viewer for the nested case; works on any report schema
+    carrying a ResourceBrief.
+    """
+    if not can_see_uploader(resource, viewer):
+        report_schema.resource.uploader_id = None
+    return report_schema

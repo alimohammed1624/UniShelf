@@ -1,10 +1,10 @@
-export const ROLE_STUDENT = 0;
+export const ROLE_MEMBER = 0;
 export const ROLE_MODERATOR = 1;
 export const ROLE_ADMIN = 2;
 export const ROLE_SUPERADMIN = 3;
 
 export const ROLE_OPTIONS = [
-  { value: ROLE_STUDENT, label: 'Student' },
+  { value: ROLE_MEMBER, label: 'Member' },
   { value: ROLE_MODERATOR, label: 'Moderator' },
   { value: ROLE_ADMIN, label: 'Admin' },
   { value: ROLE_SUPERADMIN, label: 'Super Admin' },
@@ -21,7 +21,7 @@ export function getRoleLabel(role: number): string {
  * This follows the chain of command rather than raw privilege: superadmins
  * look after admins, admins look after everyone below them. The API is
  * deliberately more permissive — it allows any strictly-lower role — so a
- * superadmin can still reach a student directly when they need to. This is
+ * superadmin can still reach a member directly when they need to. This is
  * only about what the dashboards put in front of you.
  */
 export function canManageAccount(actorRole: number, targetRole: number): boolean {

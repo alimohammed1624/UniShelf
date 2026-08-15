@@ -38,8 +38,17 @@ export interface Resource {
   type: string;
   is_public: boolean;
   is_anonymous: boolean;
-  uploader_id: number;
-  owner_id: number;
+  /**
+   * Null when the resource was uploaded anonymously and the viewer is below
+   * moderator — the API withholds the id rather than trusting the UI to hide it.
+   */
+  uploader_id: number | null;
+  /**
+   * Null on an anonymous resource for anyone who is neither its owner nor a
+   * moderator+ — the owner starts out as the uploader, so publishing it would
+   * undo the redaction above.
+   */
+  owner_id: number | null;
   is_archived: boolean;
   archived_at: string | null;
   archived_by_id: number | null;
@@ -69,7 +78,7 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: number; // 0=student, 1=moderator, 2=admin, 3=superadmin
+  role: number; // 0=member, 1=moderator, 2=admin, 3=superadmin
   is_active: boolean;
   created_at: string;
   updated_at: string | null;

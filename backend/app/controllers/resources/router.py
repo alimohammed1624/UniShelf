@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func as sa_func
+from sqlalchemy.sql import Select
 
 from app.models import Resource, User, Tag, Visibility, Report
 from app.models.enums import UserRole, AccessType, ReportStatus, ArchiveKind
@@ -33,13 +34,14 @@ from app.utils.db_helpers import (
     active_resources,
     check_resource_access,
     get_resource_or_404,
+    inaccessible_resource_ids,
     require_resource_access,
     require_resource_owner,
     sanitize_filename,
     validate_hierarchy,
 )
-from .schemas import ResourceSchema, ResourceUpdate, VisibilityCreate, VisibilitySchema, TagBrief
-from app.controllers.moderate.schemas import ResourceBrief
+from .schemas import ResourceSchema, ResourceUpdate, DirectoryCreate, VisibilityCreate, VisibilitySchema, TagBrief
+from app.controllers.moderate.schemas import ResourceBrief, redact_report_uploader
 from app.config import settings
 from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
 from pydantic import BaseModel
@@ -74,6 +76,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/resources", tags=["resources"])
 
 MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+
+def _floor_anonymity(requested: bool, parent: Optional[Resource]) -> bool:
+    """
+    Anonymity floors downward: nothing credited may sit inside an anonymous
+    folder.
+
+    Only the owner of a folder may upload into it, so a credited child of an
+    anonymous folder names the very person the folder is hiding. The floor is
+    applied once, at write time, and stored — it is not recomputed on read.
+    That keeps it compatible with the one-way latch in update_resource: moving a
+    resource can only ever add anonymity, never take it back off, so a resource
+    dragged out of an anonymous folder stays anonymous.
+    """
+    return requested or (parent is not None and parent.is_anonymous)
 
 
 # ── Upload ────────────────────────────────────────────────────
@@ -116,7 +133,7 @@ async def submit_link_resource(
 
     db.refresh(db_resource)
     UPLOAD_COUNT.labels(status="success").inc()
-    return db_resource
+    return ResourceSchema.for_viewer(db_resource, current_user)
 
 
 @router.post("", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
@@ -135,12 +152,16 @@ async def upload_resource(
     hierarchy = validate_hierarchy(hierarchy)
 
     # Validate parent exists and is a directory if specified
+    parent = None
     if parent_id is not None:
         parent = db.query(Resource).filter(Resource.id == parent_id).first()
         if parent is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
+
+    is_anonymous = _floor_anonymity(is_anonymous, parent)
 
     # Read file content and validate size
     file_content = await file.read()
@@ -209,7 +230,48 @@ async def upload_resource(
 
     db.refresh(db_resource)
     UPLOAD_COUNT.labels(status="success").inc()
-    return db_resource
+    return ResourceSchema.for_viewer(db_resource, current_user)
+
+
+@router.post("/directory", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
+def create_directory(
+    payload: DirectoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    parent = None
+    if payload.parent_id is not None:
+        parent = db.query(Resource).filter(Resource.id == payload.parent_id).first()
+        if parent is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
+        if parent.type != "directory":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
+
+    db_resource = Resource(
+        title=payload.title,
+        description=payload.description,
+        file_path=None,
+        hierarchy="",
+        parent_id=payload.parent_id,
+        filename=None,
+        size=None,
+        type="directory",
+        is_public=payload.is_public,
+        is_anonymous=_floor_anonymity(payload.is_anonymous, parent),
+        uploader_id=current_user.id,
+        owner_id=current_user.id,
+    )
+    db.add(db_resource)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create directory")
+
+    db.refresh(db_resource)
+    return ResourceSchema.for_viewer(db_resource, current_user)
 
 
 # ── List (with visibility filtering) ─────────────────────────
@@ -235,7 +297,7 @@ def list_resources(
         # Archived rows are surfaced so an owner can find and restore their own.
         # The visibility filter below still admits other people's public resources,
         # so scope the archived ones to the caller — opting in must not turn a
-        # takedown into something the whole university can read.
+        # takedown into something the whole organisation can read.
         query = query.filter(
             (Resource.is_archived == False)
             | (Resource.owner_id == current_user.id)
@@ -243,30 +305,9 @@ def list_resources(
         )
 
     # ── Visibility filtering ──
-    # Get IDs of resources where user is blacklisted
-    blacklisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == current_user.id, Visibility.access_type == int(AccessType.BLACKLIST))
-        .subquery()
-    )
-    # Get IDs of resources where user is whitelisted
-    whitelisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == current_user.id, Visibility.access_type == int(AccessType.WHITELIST))
-        .subquery()
-    )
-
-    # Admin+ sees everything; others see:
-    # (public AND not blacklisted) OR own resources OR whitelisted
-    if current_user.role < int(UserRole.ADMIN):
-        query = query.filter(
-            (
-                (Resource.is_public == True) & ~Resource.id.in_(blacklisted_ids)
-            )
-            | (Resource.uploader_id == current_user.id)
-            | (Resource.owner_id == current_user.id)
-            | Resource.id.in_(whitelisted_ids)
-        )
+    # Everything except what the caller is denied, which includes the contents
+    # of folders they cannot reach.
+    query = query.filter(Resource.id.not_in(inaccessible_resource_ids(db, current_user)))
 
     # ── Search & filter ──
     if q:
@@ -284,6 +325,11 @@ def list_resources(
 
     if uploader_id:
         query = query.filter(Resource.uploader_id == uploader_id)
+        # Redacting the id in the response is not enough on its own: filtering by
+        # uploader is an oracle that answers the same question a row at a time.
+        # Members get anonymous uploads dropped from a by-uploader search.
+        if current_user.role < int(UserRole.MODERATOR):
+            query = query.filter(Resource.is_anonymous == False)
 
     if tags:
         tag_names = [t.strip().lower() for t in tags.split(",") if t.strip()][:10]
@@ -294,7 +340,7 @@ def list_resources(
     query = query.order_by(Resource.created_at.desc(), Resource.id.desc())
 
     resources = query.offset(skip).limit(limit).all()
-    return resources
+    return [ResourceSchema.for_viewer(r, current_user) for r in resources]
 
 
 # ── Single resource detail ────────────────────────────────────
@@ -316,7 +362,7 @@ def get_resource(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
     require_resource_access(db, resource, current_user)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Update metadata ───────────────────────────────────────────
@@ -332,6 +378,8 @@ def update_resource(
     resource = get_resource_or_404(db, resource_id)
     require_resource_owner(resource, current_user)
 
+    was_anonymous = resource.is_anonymous
+
     if updates.title is not None:
         resource.title = updates.title.strip()
     if updates.description is not None:
@@ -339,6 +387,14 @@ def update_resource(
     if updates.is_public is not None:
         resource.is_public = updates.is_public
     if updates.is_anonymous is not None:
+        # One-way latch. Lifting anonymity would retroactively attach a name to
+        # something published without one, so the only accepted transition is
+        # towards anonymous — never away from it.
+        if resource.is_anonymous and not updates.is_anonymous:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Anonymity cannot be lifted once a resource has been published anonymously",
+            )
         resource.is_anonymous = updates.is_anonymous
     if updates.hierarchy is not None:
         resource.hierarchy = validate_hierarchy(updates.hierarchy)
@@ -349,10 +405,19 @@ def update_resource(
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
         resource.parent_id = updates.parent_id
+        resource.is_anonymous = _floor_anonymity(resource.is_anonymous, parent)
+
+    # A directory that has just turned anonymous takes its subtree with it,
+    # whether it was flagged directly or floored by a move: a credited child
+    # would name the owner the folder is now hiding. Only ever sets the flag, so
+    # the latch above still holds for every row it touches.
+    if resource.is_anonymous and not was_anonymous and resource.type == "directory":
+        for descendant in _collect_descendants(db, resource.id):
+            descendant.is_anonymous = True
 
     db.commit()
     db.refresh(resource)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Replace file ──────────────────────────────────────────────
@@ -422,7 +487,7 @@ async def replace_resource_file(
         logger.warning(f"Failed to delete cached thumbnail for resource {resource.id}")
 
     db.refresh(resource)
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Soft delete ───────────────────────────────────────────────
@@ -548,7 +613,7 @@ def restore_resource(
 
     if not resource.is_archived:
         require_resource_owner(resource, current_user)
-        return resource
+        return ResourceSchema.for_viewer(resource, current_user)
 
     # Who may lift an archive depends on why it was made, so the kind is checked
     # before ownership. require_resource_owner allows owner-or-admin, and a
@@ -589,7 +654,7 @@ def restore_resource(
         f"Resource {resource_id} restored by user {current_user.id} "
         f"({restored} descendant(s) cascaded)"
     )
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Download (streaming) ─────────────────────────────────────
@@ -703,7 +768,7 @@ def transfer_ownership(
     db.commit()
     db.refresh(resource)
     logger.info(f"Resource {resource_id} ownership transferred from {current_user.id} to {new_owner_id}")
-    return resource
+    return ResourceSchema.for_viewer(resource, current_user)
 
 
 # ── Visibility (ACL) management ───────────────────────────────
@@ -872,8 +937,14 @@ def _build_children_tree(
     current_depth: int,
     max_depth: int,
     user: User,
+    denied_ids: Select,
 ) -> List[dict]:
-    """Recursively build a tree of children resources with visibility filtering."""
+    """
+    Recursively build a tree of children resources with visibility filtering.
+
+    `denied_ids` is built once by the caller and threaded through the recursion
+    rather than rebuilt per level.
+    """
     if current_depth > max_depth:
         return []
 
@@ -886,27 +957,7 @@ def _build_children_tree(
         )
     )
 
-    # Apply visibility filtering for non-admin users
-    blacklisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.BLACKLIST))
-        .subquery()
-    )
-    whitelisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.WHITELIST))
-        .subquery()
-    )
-
-    if user.role < int(UserRole.ADMIN):
-        query = query.filter(
-            (
-                (Resource.is_public == True) & ~Resource.id.in_(blacklisted_ids)
-            )
-            | (Resource.uploader_id == user.id)
-            | (Resource.owner_id == user.id)
-            | Resource.id.in_(whitelisted_ids)
-        )
+    query = query.filter(Resource.id.not_in(denied_ids))
 
     children = query.order_by(Resource.title.asc()).all()
     result = []
@@ -921,7 +972,7 @@ def _build_children_tree(
         }
         if child.type == "directory" and current_depth < max_depth:
             node["children"] = _build_children_tree(
-                db, child.id, child.hierarchy, current_depth + 1, max_depth, user
+                db, child.id, child.hierarchy, current_depth + 1, max_depth, user, denied_ids
             )
         result.append(node)
 
@@ -942,7 +993,8 @@ def get_resource_children(
         return []
 
     children = _build_children_tree(
-        db, resource_id, resource.hierarchy, 1, max_depth, current_user
+        db, resource_id, resource.hierarchy, 1, max_depth, current_user,
+        inaccessible_resource_ids(db, current_user),
     )
     return children
 
@@ -1051,4 +1103,6 @@ def report_resource(
     db.refresh(new_report)
 
     logger.info(f"Report {new_report.id} submitted by user {current_user.id} on resource {resource_id}")
-    return new_report
+    return redact_report_uploader(
+        _ReportResponse.model_validate(new_report), resource, current_user
+    )

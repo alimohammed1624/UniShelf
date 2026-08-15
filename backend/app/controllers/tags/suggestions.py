@@ -218,12 +218,12 @@ def build_prompt(
         vocab_lines.append(" | ".join(p for p in parts if p))
 
     sections = [
-        "You are helping a university student filter an academic resource library.",
+        "You are helping someone filter their organisation's shared document library.",
         "",
         "AVAILABLE TAGS (you may ONLY choose from this list, copy names exactly):",
         "\n".join(vocab_lines),
         "",
-        "STUDENT PROFILE",
+        "MEMBER PROFILE",
     ]
 
     profile = [
@@ -236,7 +236,7 @@ def build_prompt(
         if values:
             sections.append(f"{label}: {', '.join(values)}")
     if not any(values for _, values in profile):
-        sections.append("(no activity yet — this is a new student)")
+        sections.append("(no activity yet — this is a new member)")
 
     if query:
         sections.append("")
@@ -247,12 +247,12 @@ def build_prompt(
     sections.extend(
         [
             "",
-            f"Return the {limit} tags from AVAILABLE TAGS this student is most likely to",
+            f"Return the {limit} tags from AVAILABLE TAGS this member is most likely to",
             "want as a filter right now. Rules:",
             '- Every "tag" value MUST appear verbatim in AVAILABLE TAGS. Never invent a tag.',
             "- Never return a tag listed under ALREADY-SELECTED FILTERS.",
             "- When a CURRENT SEARCH QUERY is present, weight it above the profile.",
-            '- "reason" is at most 8 words, addressed to the student.',
+            '- "reason" is at most 8 words, addressed to the member.',
             f"- Return fewer than {limit} rather than padding with irrelevant tags.",
         ]
     )
