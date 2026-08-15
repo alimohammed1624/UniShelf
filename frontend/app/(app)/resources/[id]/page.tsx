@@ -41,6 +41,8 @@ import {
 import { submitReport } from "@/lib/features/moderate/moderateSlice";
 import { toggleBookmarkAsync } from "@/lib/features/bookmarks/bookmarksSlice";
 import { PdfPreview } from "@/components/resources/pdf-preview";
+import { VideoPreview, detectVideoSource } from "@/components/resources/video-preview";
+import { CodePreview } from "@/components/resources/code-preview";
 
 export default function ResourceDetailPage({
   params,
@@ -100,6 +102,7 @@ export default function ResourceDetailPage({
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+  const [videoFullscreen, setVideoFullscreen] = useState(false);
 
   const resourceId = parseInt(resolvedParams.id, 10);
 
@@ -165,6 +168,7 @@ export default function ResourceDetailPage({
     pdfDocRef.current = null;
     setImageZoom(100);
     setImageFullscreen(false);
+    setVideoFullscreen(false);
     setImageBlobUrl(null);
     setImageLoading(false);
     setImagePreviewFailed(false);
@@ -368,13 +372,14 @@ export default function ResourceDetailPage({
   const apiDownloadPath = resource ? `/resources/${resource.id}/download` : '';
   const apiInlinePath = resource ? `/resources/${resource.id}/download?inline=1` : '';
   const downloadUrl = apiDownloadPath ? `/api${apiDownloadPath}` : '';
-  const inlinePreviewUrl = apiInlinePath ? `/api${apiInlinePath}` : '';
-  const isPreviewFullscreen = pdfFullscreen || imageFullscreen;
+  const isPreviewFullscreen = pdfFullscreen || imageFullscreen || videoFullscreen;
 
   const isPdf = resource?.type === "application/pdf";
   const isImage = resource?.type?.startsWith("image/");
   const isText = resource?.type?.startsWith("text/");
-  const canPreview = isPdf || isImage || isText;
+  const videoSource = detectVideoSource(resource?.type, resource?.file_path, apiInlinePath);
+  const isVideo = videoSource !== null;
+  const canPreview = isPdf || isImage || isText || isVideo;
   const isFirstPdfPage = pdfPage <= 1;
   // Disable Next while page count is unknown (loading) OR when on the last page
   const isLastPdfPage = !pdfNumPages || pdfPage >= pdfNumPages;
@@ -614,7 +619,7 @@ export default function ResourceDetailPage({
       </Button>
 
       <div
-        className={`grid grid-cols-1 gap-6 ${imageFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
+        className={`grid grid-cols-1 gap-6 ${imageFullscreen || videoFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
       >
         {/* ── Left column: Preview ─────────────────────────── */}
         {canPreview ? (
@@ -786,13 +791,21 @@ export default function ResourceDetailPage({
                   </div>
                 </div>
               )}
-              {isText && <TextPreview url={apiDownloadPath} />}
+              {isVideo && videoSource && (
+                <VideoPreview
+                  kind={videoSource.kind}
+                  src={videoSource.src}
+                  fullscreen={videoFullscreen}
+                  onToggleFullscreen={() => setVideoFullscreen((prev) => !prev)}
+                />
+              )}
+              {isText && <CodePreview url={apiDownloadPath} filename={resource.filename} />}
             </CardContent>
           </Card>
         ) : null}
 
         {/* ── Right column: Metadata ───────────────────────── */}
-        {!imageFullscreen && (
+        {!imageFullscreen && !videoFullscreen && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Details</CardTitle>
@@ -1242,42 +1255,6 @@ export default function ResourceDetailPage({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-// ── Text preview sub-component (separate to avoid re-renders) ──
-
-function TextPreview({ url }: { url: string }) {
-  const [text, setText] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get(url, { responseType: "text" })
-      .then((res) => {
-        if (!cancelled) setText(res.data);
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [url]);
-
-  if (error || text === null) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        Failed to load preview
-      </div>
-    );
-  }
-
-  return (
-    <pre className="bg-muted p-4 rounded-md overflow-auto max-h-[60vh] whitespace-pre-wrap text-sm font-mono">
-      {text}
-    </pre>
   );
 }
 
