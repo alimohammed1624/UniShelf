@@ -7,7 +7,7 @@ from enum import IntEnum
 
 
 class UserRole(IntEnum):
-    STUDENT = 0
+    MEMBER = 0
     MODERATOR = 1
     ADMIN = 2
     SUPERADMIN = 3

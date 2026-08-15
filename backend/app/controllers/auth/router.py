@@ -15,7 +15,7 @@ from .helpers import (
     verify_password,
     create_access_token,
     clear_expired_ban,
-    EDU_EMAIL_RE,
+    assert_email_allowed,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from app.utils.metrics import AUTH_ATTEMPTS
@@ -27,19 +27,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Validate .edu email with proper regex
-    if not EDU_EMAIL_RE.match(user.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must use a valid university email address (.edu)",
-        )
+    # Registration is scoped to this instance's organisation
+    assert_email_allowed(user.email)
 
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email.lower().strip(),
         hashed_password=hashed_password,
         full_name=user.full_name.strip(),
-        role=int(UserRole.STUDENT),
+        role=int(UserRole.MEMBER),
         is_active=True,
     )
     db.add(db_user)

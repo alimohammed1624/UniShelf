@@ -21,11 +21,52 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# Compiled regex: must be a valid email at a .edu domain
-EDU_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.edu$", re.IGNORECASE)
+# Compiled regex: shape only. Which domains are acceptable is deployment
+# configuration (settings.ALLOWED_EMAIL_DOMAINS), not a property of the code.
+EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 # Shell- and URL-safe punctuation for generated passwords
 _TEMP_PASSWORD_SYMBOLS = "!@#$%^&*-_=+"
+
+
+def allowed_email_domains() -> list[str]:
+    """
+    The domains this instance accepts registrations from, lowercased.
+    Empty list means the instance is open to any domain.
+    """
+    return [
+        d.strip().lower().lstrip("@")
+        for d in settings.ALLOWED_EMAIL_DOMAINS.split(",")
+        if d.strip()
+    ]
+
+
+def assert_email_allowed(email: str) -> None:
+    """
+    Raise 400 unless `email` is well-formed and sits in this instance's
+    organisation.
+
+    Matching is on the exact domain, not a suffix: a suffix test would let
+    `evil-acme.com` through for an `acme.com` instance. Subdomains that should
+    also be accepted are listed explicitly in the setting.
+    """
+    email = email.strip().lower()
+    if not EMAIL_RE.match(email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Enter a valid email address",
+        )
+
+    domains = allowed_email_domains()
+    if not domains:
+        return  # Open instance — any domain is in scope
+
+    if email.rsplit("@", 1)[1] not in domains:
+        allowed = ", ".join(f"@{d}" for d in domains)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Registration is limited to this organisation. Use an {allowed} email address.",
+        )
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
