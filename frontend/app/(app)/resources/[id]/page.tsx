@@ -166,6 +166,7 @@ export default function ResourceDetailPage({
     setPdfPreviewFailed(false);
     setPdfBlobUrl(null);
     pdfDocRef.current = null;
+    setPdfFullscreen(false);
     setImageZoom(100);
     setImageFullscreen(false);
     setVideoFullscreen(false);
@@ -619,7 +620,7 @@ export default function ResourceDetailPage({
       </Button>
 
       <div
-        className={`grid grid-cols-1 gap-6 ${imageFullscreen || videoFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
+        className={`grid grid-cols-1 gap-6 ${isPreviewFullscreen ? "" : "lg:grid-cols-[2fr_1fr]"}`}
       >
         {/* ── Left column: Preview ─────────────────────────── */}
         {canPreview ? (
@@ -691,7 +692,7 @@ export default function ResourceDetailPage({
                       variant="secondary"
                       onClick={() => setPdfFullscreen((prev) => !prev)}
                     >
-                      {pdfFullscreen ? 'Exit full screen' : 'Full screen'}
+                      {pdfFullscreen ? 'Exit expand' : 'Expand'}
                     </Button>
                   </div>
 
@@ -763,7 +764,7 @@ export default function ResourceDetailPage({
                       variant="secondary"
                       onClick={() => setImageFullscreen((prev) => !prev)}
                     >
-                      {imageFullscreen ? "Exit full screen" : "Full screen"}
+                      {imageFullscreen ? "Exit expand" : "Expand"}
                     </Button>
                   </div>
                   <div
@@ -805,7 +806,7 @@ export default function ResourceDetailPage({
         ) : null}
 
         {/* ── Right column: Metadata ───────────────────────── */}
-        {!imageFullscreen && !videoFullscreen && (
+        {!isPreviewFullscreen && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Details</CardTitle>

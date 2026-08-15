@@ -141,7 +141,7 @@ export function VideoPreview({ kind, src, fullscreen, onToggleFullscreen }: Vide
           )}
         </div>
         <Button type="button" size="sm" variant="secondary" onClick={onToggleFullscreen}>
-          {fullscreen ? 'Exit full screen' : 'Full screen'}
+          {fullscreen ? 'Exit expand' : 'Expand'}
         </Button>
       </div>
       <div
