@@ -8,6 +8,7 @@ import {
   fetchResources,
   uploadResource,
   submitLink,
+  createDirectory,
   downloadResource,
   editResource,
   deleteResource,
@@ -109,6 +110,28 @@ export default function MyResourcesPage() {
       setTitle('');
       setDescription('');
       setLinkUrl('');
+      setVisibility('public');
+    } catch {
+      // handled by toast
+    }
+  };
+
+  const handleCreateDirectory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    try {
+      const promise = dispatch(
+        createDirectory({ title, description, is_public: visibility === 'public' }),
+      ).unwrap();
+      toast.promise(promise, {
+        loading: 'Creating folder...',
+        success: 'Folder created',
+        error: (err) => (typeof err === 'string' ? err : 'Failed to create folder'),
+      });
+      await promise;
+      setTitle('');
+      setDescription('');
       setVisibility('public');
     } catch {
       // handled by toast
@@ -226,6 +249,8 @@ export default function MyResourcesPage() {
             onVisibilityChange={setVisibility}
             onSubmitFile={handleUpload}
             onSubmitLink={handleSubmitLink}
+            onSubmitDirectory={handleCreateDirectory}
+            tabs={['file', 'link', 'directory']}
           />
           <ResourceTableCard
             resources={activeResources}

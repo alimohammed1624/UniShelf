@@ -46,6 +46,31 @@ class ResourceSchema(BaseModel):
         from_attributes = True
 
 
+class DirectoryCreate(BaseModel):
+    title: str
+    description: str = ""
+    is_public: bool = True
+    is_anonymous: bool = False
+    parent_id: Optional[int] = None
+
+    @field_validator("title")
+    @classmethod
+    def title_length(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Title cannot be empty")
+        if len(v) > 255:
+            raise ValueError("Title must be at most 255 characters")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def description_length(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Description must be at most 2000 characters")
+        return v
+
+
 class ResourceUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None

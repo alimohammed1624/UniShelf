@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 
 export interface TreeNode {
@@ -25,6 +25,7 @@ export function useResourceTree({ resourceId, maxDepth = 3, maxParents = 2 }: Us
   const [data, setData] = useState<TreeData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     if (!resourceId) {
@@ -58,7 +59,9 @@ export function useResourceTree({ resourceId, maxDepth = 3, maxParents = 2 }: Us
       });
 
     return () => { cancelled = true; };
-  }, [resourceId, maxDepth, maxParents]);
+  }, [resourceId, maxDepth, maxParents, reloadToken]);
 
-  return { data, loading, error };
+  const refetch = useCallback(() => setReloadToken((t) => t + 1), []);
+
+  return { data, loading, error, refetch };
 }

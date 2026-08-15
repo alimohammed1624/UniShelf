@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func as sa_func
+from sqlalchemy.sql import Select
 
 from app.models import Resource, User, Tag, Visibility, Report
 from app.models.enums import UserRole, AccessType, ReportStatus, ArchiveKind
@@ -33,12 +34,13 @@ from app.utils.db_helpers import (
     active_resources,
     check_resource_access,
     get_resource_or_404,
+    inaccessible_resource_ids,
     require_resource_access,
     require_resource_owner,
     sanitize_filename,
     validate_hierarchy,
 )
-from .schemas import ResourceSchema, ResourceUpdate, VisibilityCreate, VisibilitySchema, TagBrief
+from .schemas import ResourceSchema, ResourceUpdate, DirectoryCreate, VisibilityCreate, VisibilitySchema, TagBrief
 from app.controllers.moderate.schemas import ResourceBrief
 from app.config import settings
 from app.utils.metrics import UPLOAD_COUNT, UPLOAD_SIZE, DOWNLOAD_COUNT
@@ -141,6 +143,7 @@ async def upload_resource(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
         if parent.type != "directory":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
 
     # Read file content and validate size
     file_content = await file.read()
@@ -212,6 +215,46 @@ async def upload_resource(
     return db_resource
 
 
+@router.post("/directory", response_model=ResourceSchema, status_code=status.HTTP_201_CREATED)
+def create_directory(
+    payload: DirectoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.parent_id is not None:
+        parent = db.query(Resource).filter(Resource.id == payload.parent_id).first()
+        if parent is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent resource not found")
+        if parent.type != "directory":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parent must be a directory")
+        require_resource_owner(parent, current_user)
+
+    db_resource = Resource(
+        title=payload.title,
+        description=payload.description,
+        file_path=None,
+        hierarchy="",
+        parent_id=payload.parent_id,
+        filename=None,
+        size=None,
+        type="directory",
+        is_public=payload.is_public,
+        is_anonymous=payload.is_anonymous,
+        uploader_id=current_user.id,
+        owner_id=current_user.id,
+    )
+    db.add(db_resource)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create directory")
+
+    db.refresh(db_resource)
+    return db_resource
+
+
 # ── List (with visibility filtering) ─────────────────────────
 
 
@@ -243,30 +286,9 @@ def list_resources(
         )
 
     # ── Visibility filtering ──
-    # Get IDs of resources where user is blacklisted
-    blacklisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == current_user.id, Visibility.access_type == int(AccessType.BLACKLIST))
-        .subquery()
-    )
-    # Get IDs of resources where user is whitelisted
-    whitelisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == current_user.id, Visibility.access_type == int(AccessType.WHITELIST))
-        .subquery()
-    )
-
-    # Admin+ sees everything; others see:
-    # (public AND not blacklisted) OR own resources OR whitelisted
-    if current_user.role < int(UserRole.ADMIN):
-        query = query.filter(
-            (
-                (Resource.is_public == True) & ~Resource.id.in_(blacklisted_ids)
-            )
-            | (Resource.uploader_id == current_user.id)
-            | (Resource.owner_id == current_user.id)
-            | Resource.id.in_(whitelisted_ids)
-        )
+    # Everything except what the caller is denied, which includes the contents
+    # of folders they cannot reach.
+    query = query.filter(Resource.id.not_in(inaccessible_resource_ids(db, current_user)))
 
     # ── Search & filter ──
     if q:
@@ -872,8 +894,14 @@ def _build_children_tree(
     current_depth: int,
     max_depth: int,
     user: User,
+    denied_ids: Select,
 ) -> List[dict]:
-    """Recursively build a tree of children resources with visibility filtering."""
+    """
+    Recursively build a tree of children resources with visibility filtering.
+
+    `denied_ids` is built once by the caller and threaded through the recursion
+    rather than rebuilt per level.
+    """
     if current_depth > max_depth:
         return []
 
@@ -886,27 +914,7 @@ def _build_children_tree(
         )
     )
 
-    # Apply visibility filtering for non-admin users
-    blacklisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.BLACKLIST))
-        .subquery()
-    )
-    whitelisted_ids = (
-        db.query(Visibility.resource_id)
-        .filter(Visibility.user_id == user.id, Visibility.access_type == int(AccessType.WHITELIST))
-        .subquery()
-    )
-
-    if user.role < int(UserRole.ADMIN):
-        query = query.filter(
-            (
-                (Resource.is_public == True) & ~Resource.id.in_(blacklisted_ids)
-            )
-            | (Resource.uploader_id == user.id)
-            | (Resource.owner_id == user.id)
-            | Resource.id.in_(whitelisted_ids)
-        )
+    query = query.filter(Resource.id.not_in(denied_ids))
 
     children = query.order_by(Resource.title.asc()).all()
     result = []
@@ -921,7 +929,7 @@ def _build_children_tree(
         }
         if child.type == "directory" and current_depth < max_depth:
             node["children"] = _build_children_tree(
-                db, child.id, child.hierarchy, current_depth + 1, max_depth, user
+                db, child.id, child.hierarchy, current_depth + 1, max_depth, user, denied_ids
             )
         result.append(node)
 
@@ -942,7 +950,8 @@ def get_resource_children(
         return []
 
     children = _build_children_tree(
-        db, resource_id, resource.hierarchy, 1, max_depth, current_user
+        db, resource_id, resource.hierarchy, 1, max_depth, current_user,
+        inaccessible_resource_ids(db, current_user),
     )
     return children
 
