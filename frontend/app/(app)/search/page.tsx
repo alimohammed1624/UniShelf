@@ -356,7 +356,7 @@ function SearchPageContent() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold mb-2">Search Resources</h1>
         <p className="text-muted-foreground">
-          Find academic materials with advanced filtering and search
+          Find documents across your organisation with advanced filtering and search
         </p>
           {/* Search Input */}
           <Input

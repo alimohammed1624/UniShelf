@@ -69,7 +69,7 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
-  role: number; // 0=student, 1=moderator, 2=admin, 3=superadmin
+  role: number; // 0=member, 1=moderator, 2=admin, 3=superadmin
   is_active: boolean;
   created_at: string;
   updated_at: string | null;

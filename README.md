@@ -1,6 +1,8 @@
 # UniShelf
 
-A centralized academic resource sharing platform for university ecosystems. Students can upload, organize, discover, and access educational materials in a structured manner.
+A centralized document storage and sharing platform for organisations. Members upload, organize, discover, and access their organisation's files in a real directory structure, with per-resource access control and optional anonymous uploads.
+
+Each deployment serves one organisation and is bound to its email domain via `ALLOWED_EMAIL_DOMAINS`.
 
 ## Tech Stack
 
@@ -32,11 +34,11 @@ The app is available at **http://localhost:8000**.
 | Grafana Dashboards | http://localhost:8000/grafana |
 | Prometheus Metrics | http://localhost:8000/metrics |
 
-> Registration requires a `.edu` email address.
+> Registration is limited to the domains in `ALLOWED_EMAIL_DOMAINS` (`unishelf.app` in `env.example`). Leave the setting blank to accept any domain.
 
 ## Database Seeding
 
-The seed script populates the database with sample users, tags, and resources (including files uploaded to MinIO).
+The seed script populates the database with a demo organisation: users at every role, a department directory tree, and the states the app is built to handle — anonymous uploads, whitelist/blacklist entries, an open moderation queue, a moderation takedown alongside an owner's own archive, bookmarks, and interest tags. Files are really uploaded to MinIO, so previews and thumbnails work.
 
 ```bash
 # Seed without clearing existing data
@@ -50,15 +52,17 @@ docker compose exec backend python seed_db.py --reset
 
 | Email | Password | Role |
 |-------|----------|------|
-| superadmin@unishelf.edu | Super123! | Super Admin |
-| admin@unishelf.edu | Admin123! | Admin |
-| admin2@unishelf.edu | Admin123! | Admin |
-| mod@unishelf.edu | Mod123! | Moderator |
-| student1@unishelf.edu | Student123! | Student |
-| student2@unishelf.edu | Student123! | Student |
-| banned@unishelf.edu | Student123! | Student (suspended) |
+| superadmin@unishelf.app | Super123! | Super Admin |
+| admin@unishelf.app | Admin123! | Admin |
+| admin2@unishelf.app | Admin123! | Admin |
+| mod@unishelf.app | Mod123! | Moderator |
+| member1@unishelf.app | Member123! | Member |
+| member2@unishelf.app | Member123! | Member (must change password) |
+| banned@unishelf.app | Member123! | Member (suspended) |
 
-The script creates 7 users, 18 tags across free-form categories, and ~20 resources organized in a logical folder hierarchy (for example `cse.intro`, `cse.core`, and `math.calculus`) with sample file content uploaded to MinIO.
+The script creates 7 users, 17 tags across free-form categories, and 29 resources in a department hierarchy (`engineering`, `people`, `finance`, `design`) with sample file content uploaded to MinIO. Re-running without `--reset` is safe: existing rows are left alone.
+
+`engineering.architecture` and `finance` are seeded private, so their contents demonstrate inherited privacy; `member1` holds whitelist entries on both and `member2` is blacklisted from one otherwise-public runbook.
 
 ## Local Development
 

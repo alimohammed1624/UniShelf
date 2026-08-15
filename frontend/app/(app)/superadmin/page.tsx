@@ -25,7 +25,7 @@ import {
   ROLE_ADMIN,
   ROLE_MODERATOR,
   ROLE_OPTIONS,
-  ROLE_STUDENT,
+  ROLE_MEMBER,
   ROLE_SUPERADMIN,
   getRoleLabel,
 } from '@/lib/roles';
@@ -63,7 +63,7 @@ function OverviewPanel() {
       <StatCard label="Super Admins" value={users.filter((u) => u.role === ROLE_SUPERADMIN).length} />
       <StatCard label="Admins" value={users.filter((u) => u.role === ROLE_ADMIN).length} />
       <StatCard label="Moderators" value={users.filter((u) => u.role === ROLE_MODERATOR).length} />
-      <StatCard label="Students" value={users.filter((u) => u.role === ROLE_STUDENT).length} />
+      <StatCard label="Members" value={users.filter((u) => u.role === ROLE_MEMBER).length} />
       <StatCard label="Suspended" value={users.filter((u) => !u.is_active).length} />
     </div>
   );
@@ -139,7 +139,7 @@ function CreateUserPanel() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState(String(ROLE_STUDENT));
+  const [role, setRole] = useState(String(ROLE_MEMBER));
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,7 +158,7 @@ function CreateUserPanel() {
       setEmail('');
       setFullName('');
       setPassword('');
-      setRole(String(ROLE_STUDENT));
+      setRole(String(ROLE_MEMBER));
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -171,7 +171,7 @@ function CreateUserPanel() {
       <CardHeader>
         <CardTitle>Create User</CardTitle>
         <CardDescription>
-          Creates an account directly at any role. The email must be a .edu address.
+          Creates an account directly at any role. The email must be on an allowed organisation domain.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -184,7 +184,7 @@ function CreateUserPanel() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@university.edu"
+              placeholder="name@yourorg.com"
             />
           </div>
           <div className="space-y-2">

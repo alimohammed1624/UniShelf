@@ -61,7 +61,7 @@ export function ResourceUploadCard({
   onSubmitDirectory,
   tabs = ['file', 'link'],
   cardTitle = 'Add Resource',
-  cardDescription = 'Share notes, assignments, study material, or a web link.',
+  cardDescription = 'Upload a file, add a link, or create a folder.',
 }: ResourceUploadCardProps) {
   const [tab, setTab] = useState<UploadTab>(tabs[0]);
   const fileSizeLabel = file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '';

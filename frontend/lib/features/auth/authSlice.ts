@@ -10,6 +10,14 @@ interface AuthState {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+  /**
+   * Whether initializeAuth has run yet. Distinguishes "not checked" from
+   * "checked, signed out", which isAuthenticated alone cannot: the token lives
+   * in localStorage, so the server render and the first client render both
+   * start out false. Public pages need this to avoid rendering a signed-out bar
+   * to someone who is signed in.
+   */
+  authChecked: boolean;
 }
 
 interface RegisterPayload {
@@ -24,6 +32,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   loading: false,
   error: null,
+  authChecked: false,
 };
 
 // Async Thunks
@@ -88,6 +97,7 @@ const authSlice = createSlice({
           state.token = token;
           state.isAuthenticated = true;
         }
+        state.authChecked = true;
       }
     },
     clearError: (state) => {

@@ -278,7 +278,7 @@ def list_resources(
         # Archived rows are surfaced so an owner can find and restore their own.
         # The visibility filter below still admits other people's public resources,
         # so scope the archived ones to the caller — opting in must not turn a
-        # takedown into something the whole university can read.
+        # takedown into something the whole organisation can read.
         query = query.filter(
             (Resource.is_archived == False)
             | (Resource.owner_id == current_user.id)

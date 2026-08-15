@@ -27,10 +27,6 @@ export default function SignupPage() {
       toast.error('Passwords do not match');
       return;
     }
-    if (!normalizedEmail.endsWith('.edu')) {
-      toast.error('Please use a valid university email address (.edu)');
-      return;
-    }
     if (password.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
@@ -61,20 +57,20 @@ export default function SignupPage() {
   return (
     <AuthCard
       title="Create account"
-      description="Join UniShelf with your university email"
+      description="Join UniShelf with your work email"
       footerText="Already have an account?"
       footerHref="/login"
       footerLinkLabel="Login"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">University Email</Label>
+          <Label htmlFor="email">Work Email</Label>
           <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@university.edu"
+            placeholder="you@yourorg.com"
             required
           />
         </div>

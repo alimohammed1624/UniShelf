@@ -15,7 +15,7 @@ from app.controllers.auth.helpers import (
     assert_can_change_role,
     generate_temp_password,
     get_password_hash,
-    EDU_EMAIL_RE,
+    assert_email_allowed,
 )
 from app.controllers.resources.schemas import ResourceSchema
 from app.utils.db_helpers import inaccessible_resource_ids
@@ -146,11 +146,7 @@ def create_managed_user(
     db: Session = Depends(get_db),
 ):
     """Create a user at any role up to the creator's own. Superadmin only."""
-    if not EDU_EMAIL_RE.match(payload.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must use a valid university email address (.edu)",
-        )
+    assert_email_allowed(payload.email)
 
     if payload.role > current_user.role:
         raise HTTPException(

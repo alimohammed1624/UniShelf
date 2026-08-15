@@ -4,7 +4,7 @@ import { useAppSelector } from '@/lib/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const ROLE_LABELS: Record<number, string> = {
-  0: 'Student',
+  0: 'Member',
   1: 'Moderator',
   2: 'Admin',
   3: 'Super Admin',
