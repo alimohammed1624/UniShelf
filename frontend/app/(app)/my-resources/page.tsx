@@ -46,6 +46,7 @@ export default function MyResourcesPage() {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
+  const [visibility, setVisibility] = useState('public');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
@@ -73,7 +74,7 @@ export default function MyResourcesPage() {
     formData.append('title', title);
     formData.append('description', description);
     formData.append('file', file);
-    formData.append('is_public', 'true');
+    formData.append('is_public', String(visibility === 'public'));
 
     try {
       const promise = dispatch(uploadResource(formData)).unwrap();
@@ -86,6 +87,7 @@ export default function MyResourcesPage() {
       setTitle('');
       setDescription('');
       setFile(null);
+      setVisibility('public');
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch {
       // handled by toast
@@ -97,7 +99,7 @@ export default function MyResourcesPage() {
     if (!linkUrl.trim()) return;
 
     try {
-      const promise = dispatch(submitLink({ title, description, url: linkUrl, is_public: true })).unwrap();
+      const promise = dispatch(submitLink({ title, description, url: linkUrl, is_public: visibility === 'public' })).unwrap();
       toast.promise(promise, {
         loading: 'Adding link...',
         success: 'Link added',
@@ -107,6 +109,7 @@ export default function MyResourcesPage() {
       setTitle('');
       setDescription('');
       setLinkUrl('');
+      setVisibility('public');
     } catch {
       // handled by toast
     }
@@ -214,11 +217,13 @@ export default function MyResourcesPage() {
             file={file}
             fileInputRef={fileInputRef}
             linkUrl={linkUrl}
+            visibility={visibility}
             onTitleChange={setTitle}
             onDescriptionChange={setDescription}
             onFileChange={setFile}
             onRemoveFile={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
             onLinkUrlChange={setLinkUrl}
+            onVisibilityChange={setVisibility}
             onSubmitFile={handleUpload}
             onSubmitLink={handleSubmitLink}
           />
